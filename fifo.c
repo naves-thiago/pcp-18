@@ -36,17 +36,12 @@ bool fifo_peek(FIFO * fifo, void ** out, uint32_t n) {
 	return true;
 }
 
-uint32_t fifo_pop(FIFO * fifo, void ** out, uint32_t count) {
-	uint32_t res;
-	if (out) {
-		res = fifo_peek(fifo, out, count);
-	}
-	else {
-		res = fifo_count(fifo);
-		if (res > count)
-			res = count;
+void fifo_remove(FIFO * fifo, uint32_t n) {
+	if (n >= fifo_count(fifo)) {
+		fifo->write = 0;
+		fifo->read = 0;
+		return;
 	}
 
-	fifo->read = (fifo->read + res) % fifo->length;
-	return res;
+	fifo->read = (fifo->read + n) % fifo->length;
 }

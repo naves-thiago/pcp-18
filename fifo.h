@@ -66,17 +66,13 @@ void fifo_push(FIFO * fifo, void * p);
 bool fifo_peek(FIFO * fifo, void ** out, uint32_t count);
 
 /**
- * @brief Move the oldest pointers in the FIFO (up to @p count) to @p out
- * @note If @p out is NULL, the pointers will be discarded instead
+ * @brief Remove the @p n oldest pointers from the FIFO
  *
  * @param[in] fifo The FIFO instance
- * @param[out] out Copy destination or NULL
- * @param[in] count Maximum amount of pointers to move
- *
- * @return The number of pointers actually moved
+ * @param[in] n Amount of pointers to remove
  *
  * @sa fifo_peek()
  */
-uint32_t fifo_pop(FIFO * fifo, void ** out, uint32_t count);
+void fifo_remove(FIFO * fifo, uint32_t n);
 
 /** @} */
