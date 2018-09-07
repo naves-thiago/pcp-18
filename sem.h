@@ -37,4 +37,9 @@ uint32_t sem_wait(semaphore_t * sem);
  */
 uint32_t sem_signal(semaphore_t * sem);
 
+/**
+ * @brief Sets the semaphore counter. If count > 0, also nofities the waiting threads
+ */
+void sem_set(semaphore_t * sem, uint32_t count);
+
 /** @} */

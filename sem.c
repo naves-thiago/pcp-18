@@ -31,3 +31,11 @@ uint32_t sem_signal(semaphore_t * sem) {
 	pthread_mutex_unlock(&sem->mutex);
 	return c;
 }
+
+void sem_set(semaphore_t * sem, uint32_t count) {
+	pthread_mutex_lock(&sem->mutex);
+	sem->count = count;
+	if (count)
+		pthread_cond_broadcast(&sem->cond);
+	pthread_mutex_unlock(&sem->mutex);
+}

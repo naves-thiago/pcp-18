@@ -54,6 +54,22 @@ int main() {
 	for (int i=0; i<4; i++)
 		pthread_join(threads[i], NULL);
 
+	printf("Main: sem = 0\n");
+	sem_set(&sem, 0);
+
+	pthread_create(&threads[2], &attr, dec, &id[2]);
+	pthread_create(&threads[3], &attr, dec, &id[3]);
+
+	printf("Main: sem = 1\n");
+	sem_set(&sem, 1);
+	sleep(2);
+
+	printf("Main: sem = 20\n");
+	sem_set(&sem, 20);
+
+	for (int i=0; i<4; i++)
+		pthread_join(threads[i], NULL);
+
 	sem_destroy(&sem);
 	pthread_attr_destroy(&attr);
 	pthread_exit(NULL);
