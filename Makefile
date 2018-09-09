@@ -22,7 +22,7 @@ tests: test_sem test_fifo
 test_sem: $(BUILD_DIR)/test_sem.o $(SEM)
 	gcc -Wall -g -lpthread $^ -o $@
 
-test_fifo: $(BUILD_DIR)/test_fifo.o $(FIFO)
+test_fifo: $(BUILD_DIR)/test_fifo.o $(FIFO) $(SEM)
 	gcc -Wall -g -lpthread $^ -o $@
 
 $(BUILD_DIR)/%.o:%.c

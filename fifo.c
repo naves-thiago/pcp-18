@@ -1,104 +1,92 @@
+#include <stdlib.h>
 #include <stddef.h>
 #include "fifo.h"
 
-static inline uint32_t fifo_count_us(fifo_t * fifo);
-static void fifo_remove_us(fifo_t * fifo, uint32_t n);
-static bool fifo_peek_us(fifo_t * fifo, void ** out, uint32_t n);
+#if 0
+#include <stdio.h>
+#define log(...) printf(__VA_ARGS__)
+#else
+#define log(...)
+#endif
 
-void fifo_init(fifo_t * fifo, void ** buffer, uint32_t length) {
+void fifo_init(fifo_t * fifo, uint32_t length, uint32_t consumers) {
+	fifo->buffer = (void **)malloc((length + 1) * sizeof(void*));
+	fifo->read = (uint32_t *)calloc(consumers, sizeof(uint32_t));
+	fifo->pend_pop = (uint32_t *)calloc((length + 1), sizeof(uint32_t));
+	fifo->cond_pop = (pthread_cond_t *)malloc((length + 1) * sizeof(pthread_cond_t));
+	for (uint32_t i=0; i<length + 1; i++)
+		pthread_cond_init(&fifo->cond_pop[i], NULL);
 	fifo->write = 0;
-	fifo->read = 0;
-	fifo->length = length+1;
-	fifo->buffer = buffer;
+	fifo->length = length + 1;
+	fifo->consumers = consumers;
+	sem_create(&fifo->sem_push, length);
 	pthread_mutex_init(&fifo->mutex, NULL);
 }
 
 void fifo_clear(fifo_t * fifo) {
 	pthread_mutex_lock(&fifo->mutex);
 	fifo->write = 0;
-	fifo->read = 0;
-	pthread_mutex_unlock(&fifo->mutex);
-}
+	
+	for (uint32_t i=0; i<fifo->consumers; i++)
+		fifo->read[i] = 0;
 
-/* Not thread safe */
-static inline uint32_t fifo_count_us(fifo_t * fifo) {
-	return (fifo->length - fifo->read + fifo->write) % fifo->length;
-}
+	for (uint32_t i=0; i<fifo->length; i++)
+		fifo->pend_pop[i] = 0;
 
-uint32_t fifo_count(fifo_t * fifo) {
-	pthread_mutex_lock(&fifo->mutex);
-	uint32_t c = fifo_count_us(fifo);
+	sem_set(&fifo->sem_push, fifo->length-1);
 	pthread_mutex_unlock(&fifo->mutex);
-	return c;
 }
 
 void fifo_push(fifo_t * fifo, void * p) {
+	log("push %u\n", (uint32_t)p);
+	log("push W sem_push\n");
+	sem_wait(&fifo->sem_push);
+	log("push W mutex\n");
 	pthread_mutex_lock(&fifo->mutex);
+	log("push G mutex\n");
 	fifo->buffer[fifo->write] = p;
+	fifo->pend_pop[fifo->write] = fifo->consumers;
+	uint32_t w = fifo->write;
+//	pthread_cond_broadcast(&fifo->cond_pop[fifo->write]);
 	fifo->write = (fifo->write + 1) % fifo->length;
-	if (fifo->write == fifo->read)
-		fifo->read = (fifo->read + 1) % fifo->length;
+	log("push BC %u\n", w);
+	pthread_cond_broadcast(&fifo->cond_pop[w]);
 	pthread_mutex_unlock(&fifo->mutex);
+	log("push R mutex\n");
 }
 
-bool fifo_try_push(fifo_t * fifo, void * p) {
+void fifo_pop(fifo_t * fifo, uint32_t consumer, void ** out) {
+	log("pop W mutex\n");
 	pthread_mutex_lock(&fifo->mutex);
-	uint32_t new_write = (fifo->write + 1) % fifo->length;
-	if (new_write == fifo->read) {
-		pthread_mutex_unlock(&fifo->mutex);
-		return false;
+	log("pop G mutex\n");
+	uint32_t r = fifo->read[consumer];
+//	if (r != fifo->write)
+//		fifo->read[consumer] = (r + 1) % fifo->length;
+	
+	log("pop W cond %u\n", r);
+	while (!fifo->pend_pop[r])
+		pthread_cond_wait(&fifo->cond_pop[r], &fifo->mutex);
+	log("pop G cond\n");
+
+	fifo->read[consumer] = (r + 1) % fifo->length;
+	fifo->pend_pop[r] --;
+	*out = fifo->buffer[r];
+	if (!fifo->pend_pop[r]) {
+		sem_signal(&fifo->sem_push);
+		log("pop S sem_push\n");
 	}
-
-	fifo->buffer[fifo->write] = p;
-	fifo->write = new_write;
 	pthread_mutex_unlock(&fifo->mutex);
-	return true;
-}
-
-static bool fifo_peek_us(fifo_t * fifo, void ** out, uint32_t n) {
-	uint32_t c = fifo_count_us(fifo);
-	if (n >= c)
-		return false;
-
-	uint32_t r = fifo->read;
-	uint32_t l = fifo->length;
-	*out = fifo->buffer[(r + n) % l];
-
-	return true;
-}
-
-bool fifo_peek(fifo_t * fifo, void ** out, uint32_t n) {
-	pthread_mutex_lock(&fifo->mutex);
-	bool ret = fifo_peek_us(fifo, out, n);
-	pthread_mutex_unlock(&fifo->mutex);
-	return ret;
-}
-
-bool fifo_pop(fifo_t * fifo, void ** out) {
-	pthread_mutex_lock(&fifo->mutex);
-	bool ret = fifo_peek_us(fifo, out, 0);
-	if (ret)
-		fifo_remove_us(fifo, 1);
-	pthread_mutex_unlock(&fifo->mutex);
-	return ret;
-}
-
-static void fifo_remove_us(fifo_t * fifo, uint32_t n) {
-	if (n >= fifo_count_us(fifo)) {
-		fifo->write = 0;
-		fifo->read = 0;
-		return;
-	}
-
-	fifo->read = (fifo->read + n) % fifo->length;
-}
-
-void fifo_remove(fifo_t * fifo, uint32_t n) {
-	pthread_mutex_lock(&fifo->mutex);
-	fifo_remove_us(fifo, n);
-	pthread_mutex_unlock(&fifo->mutex);
+	log("pop R mutex\n");
 }
 
 void fifo_destroy(fifo_t * fifo) {
 	pthread_mutex_destroy(&fifo->mutex);
+	for (uint32_t i=0; i<fifo->length; i++)
+		pthread_cond_destroy(&fifo->cond_pop[i]);
+
+	sem_destroy(&fifo->sem_push);
+	free(fifo->buffer);
+	free(fifo->read);
+	free(fifo->cond_pop);
+	free(fifo->pend_pop);
 }
