@@ -22,7 +22,7 @@ int test_threads_push;
 int test_threads_pop;
 int test_threads_count;
 
-static inline void test_failed(void) {
+static void test_failed(void) {
 	exit(1);
 }
 
