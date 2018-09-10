@@ -40,7 +40,7 @@ void * dec(void * p) {
 }
 
 int main() {
-	srand(4);
+	srand(time(NULL));
 	sem_create(&sem, 3);
 	printf("Main: sem = 3\n");
 
