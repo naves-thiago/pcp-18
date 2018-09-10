@@ -49,6 +49,7 @@ void * f_consumidor(void * p) {
 	int id = *(int *)p; // Thread ID
 
 	for (uint32_t i=0; i<ITERACOES * produtores; i++) {
+		DELAY();
 		dados_t * dados = consome(id);
 		printf("Consumido (%d): %s\n", id, dados->s);
 		if (!sem_wait(&dados->sem))
