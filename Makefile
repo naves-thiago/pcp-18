@@ -14,7 +14,7 @@ DEP:=$(OBJ:.o=.d)
 
 .PHONY: clean tests
 
-pcp: $(BUILD_DIR)/main.o $(FIFO)
+pcp: $(BUILD_DIR)/main.o $(FIFO) $(SEM)
 	gcc -Wall -g -lpthread $^ -o $@
 
 tests: test_sem test_fifo
