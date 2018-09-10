@@ -46,30 +46,12 @@ void fifo_init(fifo_t * fifo, uint32_t length, uint32_t consumers);
 void fifo_clear(fifo_t * fifo);
 
 /**
- * @brief Counts the number of queued pointers
- *
- * @param[in] fifo The FIFO instance
- * @return The number of pointers in the FIFO
- */
-//uint32_t fifo_count(fifo_t * fifo);
-
-/**
  * @brief Adds a pointer to the FIFO. If the FIFO is full, the oldest pointer is replaced
  *
  * @param[in] fifo The FIFO instance
  * @param[in] p The pointer to add
  */
 void fifo_push(fifo_t * fifo, void * p);
-
-/**
- * @brief Adds a pointer to the FIFO if there is available space.
- *
- * @param[in] fifo The FIFO instance
- * @param[in] p The pointer to add
- *
- * @return True successfull, false if no space was available
- */
-//bool fifo_try_push(fifo_t * fifo, void * p);
 
 /**
  * @brief Copy the oldest pointer to @p out and removes it from the FIFO
