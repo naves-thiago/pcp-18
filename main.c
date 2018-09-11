@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <time.h>
 #include "fifo.h"
 #include "sem.h"
 
 // Delay opcinal para misturar a execucao das threads
-#define DELAY() usleep((rand() % 100) * 100)
 
 #define N 10          // Tamanho da fila (quantidade de mensagens)
 #define ITERACOES 50  // Numero total de dados a colocar na fila por produtor
@@ -20,6 +20,13 @@ fifo_t fila;           // Fila de N posicoes
 uint32_t produtores;   // Quantidade de produtores
 uint32_t consumidores; // Quantidade de consumidores
 int * ids;             // IDs das threads
+
+void delay(void) {
+	struct timespec t;
+	t.tv_sec = 0;
+	t.tv_nsec = (rand() % 100) * 100000;
+	nanosleep(&t, NULL);
+}
 
 void deposita(dados_t * dados) {
 	fifo_push(&fila, dados);
@@ -35,7 +42,7 @@ void * f_produtor(void * p) {
 	int id = *(int *)p; // Thread ID
 
 	for (int i=0; i<ITERACOES; i++) {
-		DELAY();
+		delay();
 		dados_t * dados = (dados_t *)malloc(sizeof(dados_t) + 100);
 		sem_create(&dados->sem, consumidores);
 		snprintf(dados->s, 100, "Thread %d: %p", id, dados);
@@ -49,7 +56,7 @@ void * f_consumidor(void * p) {
 	int id = *(int *)p; // Thread ID
 
 	for (uint32_t i=0; i<ITERACOES * produtores; i++) {
-		DELAY();
+		delay();
 		dados_t * dados = consome(id);
 		printf("Consumido (%d): %s\n", id, dados->s);
 		if (!sem_wait(&dados->sem))

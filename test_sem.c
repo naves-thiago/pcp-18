@@ -9,16 +9,23 @@ pthread_attr_t attr;
 int id[] = {0, 1, 2, 3};
 semaphore_t sem;
 
+void delay(void) {
+	struct timespec t;
+	t.tv_sec = 0;
+	t.tv_nsec = (rand() % 100) * 100000;
+	nanosleep(&t, NULL);
+}
+
 void * inc(void * p) {
 	int id = *(int *)p;
 	int count = 6 + id;
-	usleep((rand() % 100) * 1000);
+	delay();
 	printf("inc %d: start\n", id);
 
 	for (int i=0; i<count; i++) {
 		int c = sem_signal(&sem);
 		printf("inc %d: signal - c = %d -> %d\n", id, c, c + 1);
-		usleep((rand() % 100) * 1000);
+		delay();
 	}
 	printf("inc %d: done\n", id);
 	return NULL;
@@ -27,13 +34,13 @@ void * inc(void * p) {
 void * dec(void * p) {
 	int id = *(int *)p;
 	int count = 3 + id;
-	usleep((rand() % 100) * 1000);
+	delay();
 	printf("dec %d: start\n", id);
 
 	for (int i=0; i<count; i++) {
 		int c = sem_wait(&sem);
 		printf("dec %d: wait - c = %d -> %d\n", id, c+1, c);
-		usleep((rand() % 100) * 1000);
+		delay();
 	}
 	printf("dec %d: done\n", id);
 	return NULL;

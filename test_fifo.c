@@ -22,6 +22,13 @@ int test_threads_push;
 int test_threads_pop;
 int test_threads_count;
 
+void delay(void) {
+	struct timespec t;
+	t.tv_sec = 0;
+	t.tv_nsec = (rand() % 100) * 100000;
+	nanosleep(&t, NULL);
+}
+
 static void test_failed(void) {
 	exit(1);
 }
@@ -31,7 +38,7 @@ void * push(void * p) {
 	uint32_t id = *(uint32_t *) p;
 
 	for (uint32_t i=0; i < ITERATIONS; i++) {
-		usleep((rand() % 100) * 100);
+		delay();
 		uint32_t tmp = (id << 16) | (i & UINT16_MAX);
 		fifo_push(&fifo, (void *)tmp);
 	}
@@ -50,6 +57,7 @@ void * pop(void * p) {
 		sem_create(&counters[i], 0);
 
 	for (volatile uint32_t i=0; i < ITERATIONS * test_threads_push; i++) {
+		delay();
 		volatile uint32_t data = UINT32_MAX;
 		fifo_pop(&fifo, id, (void **)&data);
 		uint32_t push_thread = data >> 16;
