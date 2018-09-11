@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 199309L
 #include "fifo.h"
 #include "sem.h"
 #include <pthread.h>
@@ -6,9 +7,9 @@
 #include <stdlib.h>
 
 #define FIFO_LEN       10
-#define ITERATIONS     100
-#define THREADS_PUSH   3
-#define THREADS_POP    4
+#define ITERATIONS     50
+#define THREADS_PUSH   30
+#define THREADS_POP    20
 #define THREAD_COUNT   ((THREADS_POP) + (THREADS_PUSH))
 
 #define ERROR(...) do { printf(__VA_ARGS__); printf("Line: %d\n", __LINE__); } while (0);
@@ -25,7 +26,7 @@ int test_threads_count;
 void delay(void) {
 	struct timespec t;
 	t.tv_sec = 0;
-	t.tv_nsec = (rand() % 100) * 100000;
+	t.tv_nsec = (rand() % 100) * 10000;
 	nanosleep(&t, NULL);
 }
 
@@ -36,6 +37,7 @@ static void test_failed(void) {
 // Pushes numbers from 0 to ITERATIONS-1
 void * push(void * p) {
 	uint32_t id = *(uint32_t *) p;
+	printf("Start push %u\n", id);
 
 	for (uint32_t i=0; i < ITERATIONS; i++) {
 		delay();

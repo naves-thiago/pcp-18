@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -5,8 +6,6 @@
 #include <time.h>
 #include "fifo.h"
 #include "sem.h"
-
-// Delay opcinal para misturar a execucao das threads
 
 #define N 10          // Tamanho da fila (quantidade de mensagens)
 #define ITERACOES 50  // Numero total de dados a colocar na fila por produtor
@@ -21,10 +20,11 @@ uint32_t produtores;   // Quantidade de produtores
 uint32_t consumidores; // Quantidade de consumidores
 int * ids;             // IDs das threads
 
+// Delay opcinal para misturar a execucao das threads
 void delay(void) {
 	struct timespec t;
 	t.tv_sec = 0;
-	t.tv_nsec = (rand() % 100) * 100000;
+	t.tv_nsec = (rand() % 100) * 10000;
 	nanosleep(&t, NULL);
 }
 
