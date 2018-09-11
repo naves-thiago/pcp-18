@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -19,14 +18,7 @@ fifo_t fila;           // Fila de N posicoes
 uint32_t produtores;   // Quantidade de produtores
 uint32_t consumidores; // Quantidade de consumidores
 int * ids;             // IDs das threads
-
-// Delay opcinal para misturar a execucao das threads
-void delay(void) {
-	struct timespec t;
-	t.tv_sec = 0;
-	t.tv_nsec = (rand() % 100) * 10000;
-	nanosleep(&t, NULL);
-}
+pthread_mutex_t print_mutex;
 
 void deposita(dados_t * dados) {
 	fifo_push(&fila, dados);
@@ -42,11 +34,11 @@ void * f_produtor(void * p) {
 	int id = *(int *)p; // Thread ID
 
 	for (int i=0; i<ITERACOES; i++) {
-		delay();
 		dados_t * dados = (dados_t *)malloc(sizeof(dados_t) + 100);
 		sem_create(&dados->sem, consumidores);
 		snprintf(dados->s, 100, "Thread %d: %p", id, dados);
 		printf("Produzido (%d): %s\n", id, dados->s);
+		fflush(stdout);
 		deposita(dados);
 	}
 	return NULL;
@@ -56,9 +48,9 @@ void * f_consumidor(void * p) {
 	int id = *(int *)p; // Thread ID
 
 	for (uint32_t i=0; i<ITERACOES * produtores; i++) {
-		delay();
 		dados_t * dados = consome(id);
 		printf("Consumido (%d): %s\n", id, dados->s);
+		fflush(stdout);
 		if (!sem_wait(&dados->sem))
 			free(dados);
 	}
