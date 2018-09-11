@@ -40,3 +40,7 @@ Em caso de erro, o teste imprime uma mensagem e aborta a execução do programa.
 
 Ambos os programas de teste e o executável principal foram testados com o valgrind para detectar e corrigir problemas de alocação de memória
 e estouro de buffers.
+
+Compilando:
+Executável principal: $ make
+Testes: $ make tests
