@@ -30,6 +30,6 @@ $(BUILD_DIR)/%.o:%.c
 	gcc -Wall -g -c -std=c99 -MMD $< -o $@
 
 clean:
-	rm -f $(OBJ) $(DEP) pcp test_sem
+	rm -f $(OBJ) $(DEP) pcp test_sem test_fifo
 
 -include $(DEP)
