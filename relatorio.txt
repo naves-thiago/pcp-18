@@ -1,0 +1,42 @@
+A fila do trabalho foi implementada utilizando um buffer circular e armazena ponteiros de void.
+Todos os produtores enxergam a fila como uma única fila, mas cada consumidor a enxerga como se fosse sua própria fila.
+Isto é, cada consumidor pode ler elementos da fila de forma independente enquanto houverem elementos, mas um
+elemento só é de fato removido após ter sido lido por todos os consumidores.
+Internamente a fila mantém um ponteiro de leitura para cada consumidor.
+Cada elemento da fila tem uma condição (pthread_cond_t) associada, utilizada para bloquear os consumidores quando tentarem
+ler uma posição vazia da fila. A fila tem uma posição a mais do que as que podem ser utilizadas. Isso garante que haja sempre
+ao menos uma posição vazia. Assim, podemos bloquear um consumidor quando este tiver lido todos os elementos sem tratamento adicional.
+Ao inserir um elemento nessa posição, um broadcast desbloqueia todos os consumidores que estiverem nesse ponto.
+Além disso, cada posição tem um contador de leituras pendentes, que permite saber quando podemos reutilizar essa posição.
+Como cada consumidor tem um ponteiro de leitura independente, não é possível um mesmo consumidor ler o mesmo elemento múltiplas vezes.
+Portanto, um contador é suficiente para garantir que todas as leituras foram feitas por consumidores diferentes.
+Para limitar as inserções, um semáforo conta quantas posições vazias há na fila. Antes de inserir um elemento na fila, esse semáforo
+é decrementado, bloqueando a thread caso a fila esteja cheia.
+
+Executável principal:
+Cada thread produtora aloca e insere 50 elementos na fila. Cada elemento é uma struct que contém uma string e um semáforo. A string indica
+qual thread produziu e o endereço da struct na memória. O semáforo permite que os produtores saibam quando desalocar o elemento.
+Ao produzir ou consumir um elemento, a operação ("Produzido" / "Consumido"), o ID da thread e a string são impressas no terminal.
+Vale notar que a saída no terminal tende a ser fora de ordem, evidenciado por uma sequencia de mensagens de produzido (ou consumido) maior
+do que o tamanho da fila. Contudo os testes abaixo mostram que a fila funciona como esperado.
+
+Testes:
+Foram escritos 2 programas para testar os dois módulos principais do programa:
+test_sem e test_fifo, que testam o semáforo e a fila de mensagens respectivamente.
+O teste do semáforo é parcialmente manual, duas threads incrementam e duas outras decrementam o contador e todas imprimem no terminal as
+mudanças de estado.
+O teste da fila é automático e consiste de 4 etapas independentes:
+- Teste single threaded testa o funcionamento da fila sem concorrência.
+- Teste com 1 produtor e múltiplos consumidores (20 por padrão).
+- Teste com múltiplos produtores (30 por padrão) e 1 consumidor.
+- Teste com múltiplos produtores (30) e múltiplos consumidores (20).
+
+Nesses testes, cada elemento da fila é um inteiro de 32 bits em que os primeiros 16 contém o ID do produtor e os demais um número
+sequencial. Assim, os consumidores podem verificar que, para cada produtor, todos as mensagens foram recebidas e foram recebidas em ordem.
+Cada produtor insere elementos suficientes para preencher a fila diversas vezes (50 elementos cada para uma fila de 10 elementos).
+Para incentivar o acesso desordenado à fila durante os teste, foram inseridos delays aleatórios antes das inserções e remoções de elementos.
+Cada etapa do teste da fila imprime o nome do teste, número de produtores e consumidores no início e "Done." ao final.
+Em caso de erro, o teste imprime uma mensagem e aborta a execução do programa.
+
+Ambos os programas de teste e o executável principal foram testados com o valgrind para detectar e corrigir problemas de alocação de memória
+e estouro de buffers.
