@@ -23,8 +23,7 @@ typedef struct {
 	uint32_t * read;           /**< Oldest data position for each consumer   */
 	uint32_t length;           /**< FIFO length                              */
 	uint32_t consumers;        /**< Number of consumers                      */
-	uint32_t * pend_pop;       /**< Pending pops for each pointer            */
-	pthread_cond_t * cond_pop; /**< Conditions to block on pop               */
+	semaphore_t * sem_pop;     /**< Semaphores to block on pop               */
 	semaphore_t sem_push;      /**< Block on push semaphore                  */
 	pthread_mutex_t mutex;
 } fifo_t;
