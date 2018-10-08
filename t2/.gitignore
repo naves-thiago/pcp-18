@@ -1,2 +1,4 @@
 test_fifo
+test_mpi
+test_quadrature
 build/*

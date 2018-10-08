@@ -16,10 +16,16 @@ DEP:=$(OBJ:.o=.d)
 pcp: $(BUILD_DIR)/main.o $(FIFO)
 	gcc -Wall -g -lpthread $^ -o $@
 
-tests: test_fifo
+tests: test_fifo test_quadrature test_mpi
 
 test_fifo: $(BUILD_DIR)/test_fifo.o $(FIFO)
 	gcc -Wall -g $^ -o $@
+
+test_quadrature: test_quadrature.c
+	gcc -Wall -g -O0 $^ -o $@ -lm
+
+test_mpi: test_mpi.c
+	mpicc -Wall $^ -o $@
 
 $(BUILD_DIR)/%.o:%.c
 	@mkdir -p $(BUILD_DIR)
