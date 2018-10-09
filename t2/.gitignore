@@ -1,3 +1,6 @@
+equal
+bag_equal
+bag
 test_fifo
 test_mpi
 test_quadrature
