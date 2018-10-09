@@ -15,8 +15,7 @@ int main(int argc, char ** argv) {
 	if (procid == 0) {
 		for (int i=0; i<numprocs; i++) {
 			int val;
-			MPI_Status status;
-			ierr = MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+			ierr = MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			if (ierr != MPI_SUCCESS)
 				printf("Receive failed\n");
 			else
