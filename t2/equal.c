@@ -7,6 +7,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#define debug_print(...) printf(__VA_ARGS__)
+
 /**
  * @brief This struct stores a test function pointer
  * and the integration interval
@@ -36,7 +38,7 @@ static const test_function_t * test;
 void main_master(void) {
 	int intervals;
 	MPI_Comm_size(MPI_COMM_WORLD, &intervals);
-	printf("Main: %d intervals\n", intervals);
+	debug_print("Main: %d intervals\n", intervals);
 	double step = fabs(test->end - test->start) / intervals;
 	double a = test->start;
 	double area = 0;
@@ -50,9 +52,9 @@ void main_master(void) {
 		a += step;
 	}
 
-	printf("Master: [%f, %f]\n", a, test->end);
+	debug_print("Master: [%f, %f]\n", a, test->end);
 	area = integrate(test->f, a, test->end);
-	printf("Master: area = %f\n", area);
+	debug_print("Master: area = %f\n", area);
 
 	for (int i=1; i<intervals; i++) {
 		double received;
@@ -71,11 +73,11 @@ void main_worker(void) {
 	             MPI_STATUS_IGNORE) != MPI_SUCCESS)
 		MPI_Abort(MPI_COMM_WORLD, 2);
 
-	printf("Worker: [%f, %f]\n", interval[0], interval[1]);
+	debug_print("Worker: [%f, %f]\n", interval[0], interval[1]);
 	double area = integrate(test->f, interval[0], interval[1]);
 	if (MPI_Send(&area, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD) != MPI_SUCCESS)
 		MPI_Abort(MPI_COMM_WORLD, 3);
-	printf("Worker: area = %f\n", area);
+	debug_print("Worker: area = %f\n", area);
 }
 
 int main(int argc, char ** argv) {
