@@ -24,7 +24,7 @@ static double f_test4(double x) {
 }
 
 /**
- * @brief List of available tests (selected via the first command line argument
+ * @brief List of available tests (selected via the first command line argument)
  */
 static const test_function_t tests[] = {
 	{.start = -5, .end = 5, .f = f_test4}
