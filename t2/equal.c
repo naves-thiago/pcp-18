@@ -34,27 +34,27 @@ static const test_function_t tests[] = {
 static const test_function_t * test;
 
 void main_master(void) {
-	int numprocs;
-	MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
-	int intervals = numprocs - 1;
+	int intervals;
+	MPI_Comm_size(MPI_COMM_WORLD, &intervals);
 	printf("Main: %d intervals\n", intervals);
 	double step = fabs(test->end - test->start) / intervals;
 	double a = test->start;
 	double area = 0;
-	for (int i=1; i<=intervals; i++) {
+	for (int i=1; i<intervals; i++) {
 		double interval[2];
 		interval[0] = a;
-		if (i != intervals)
-			interval[1] = a + step;
-		else
-			interval[1] = test->end; // Avoid rounding errors
+		interval[1] = a + step;
 
 		if (MPI_Send(&interval, 2, MPI_DOUBLE, i, 0, MPI_COMM_WORLD) != MPI_SUCCESS)
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		a += step;
 	}
 
-	for (int i=1; i<=intervals; i++) {
+	printf("Master: [%f, %f]\n", a, test->end);
+	area = integrate(test->f, a, test->end);
+	printf("Master: area = %f\n", area);
+
+	for (int i=1; i<intervals; i++) {
 		double received;
 		if (MPI_Recv(&received, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
 					 MPI_STATUS_IGNORE) != MPI_SUCCESS)
