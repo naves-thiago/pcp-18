@@ -10,6 +10,11 @@
 #define debug_print(...) printf(__VA_ARGS__)
 
 /**
+ * @brief If true, the master process will also integrate the function
+ */
+#define MASTER_WORKER 0
+
+/**
  * @brief This struct stores a test function pointer
  * and the integration interval
  */
@@ -36,27 +41,36 @@ static const test_function_t tests[] = {
 static const test_function_t * test;
 
 void main_master(void) {
-	int intervals;
-	MPI_Comm_size(MPI_COMM_WORLD, &intervals);
+	int num_procs;
+	MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+	int intervals = MASTER_WORKER ? num_procs : num_procs - 1;
+	int num_sends = num_procs - 1;
+
+	debug_print("Master worker = %s\n", MASTER_WORKER ? "true" : "false");
 	debug_print("Main: %d intervals\n", intervals);
 	double step = fabs(test->end - test->start) / intervals;
 	double a = test->start;
 	double area = 0;
-	for (int i=1; i<intervals; i++) {
+	for (int i=1; i<=num_sends; i++) {
 		double interval[2];
 		interval[0] = a;
-		interval[1] = a + step;
+		if (MASTER_WORKER || i < num_sends)
+			interval[1] = a + step;
+		else
+			interval[1] = test->end; // Avoid rounding error
 
 		if (MPI_Send(&interval, 2, MPI_DOUBLE, i, 0, MPI_COMM_WORLD) != MPI_SUCCESS)
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		a += step;
 	}
 
-	debug_print("Master: [%f, %f]\n", a, test->end);
-	area = integrate(test->f, a, test->end);
-	debug_print("Master: area = %f\n", area);
+	if (MASTER_WORKER) {
+		debug_print("Master: [%f, %f]\n", a, test->end);
+		area = integrate(test->f, a, test->end);
+		debug_print("Master: area = %f\n", area);
+	}
 
-	for (int i=1; i<intervals; i++) {
+	for (int i=1; i<=num_sends; i++) {
 		double received;
 		if (MPI_Recv(&received, 1, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
 					 MPI_STATUS_IGNORE) != MPI_SUCCESS)
