@@ -12,14 +12,14 @@ OBJ:=$(addprefix $(BUILD_DIR)/, $(OBJ))
 DEP:=$(OBJ:.o=.d)
 
 # Flags
-LDFLAGS:=-Wall -g -O2 -lm
+LDFLAGS:=-Wall -g -lm
 
 .PHONY: clean tests
 
 equal: $(BUILD_DIR)/equal.o $(BUILD_DIR)/quadrature.o
 	mpicc $^ -o $@ $(LDFLAGS)
 
-bag_equal: $(BUILD_DIR)/bag_equal.o $(FIFO) $(BUILD_DIR)/quadrature.o
+bag_equal: $(BUILD_DIR)/bag_equal.o $(BUILD_DIR)/quadrature.o
 	mpicc $^ -o $@ $(LDFLAGS)
 
 bag: $(BUILD_DIR)/bag.o $(FIFO) $(BUILD_DIR)/quadrature.o
@@ -41,6 +41,6 @@ $(BUILD_DIR)/%.o:%.c
 	mpicc -Wall -g -c -O2 -std=c99 -MMD $< -o $@
 
 clean:
-	rm -f $(OBJ) $(DEP) pcp test_fifo
+	rm -f $(OBJ) $(DEP) pcp test_fifo equal bag_equal
 
 -include $(DEP)
