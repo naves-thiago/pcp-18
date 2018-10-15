@@ -20,14 +20,6 @@ typedef struct {
 	func_t f;
 } test_function_t;
 
-/**
- * @brief This struct stores an integration interval
- */
-typedef struct {
-	double start;
-	double end;
-} interval_t;
-
 static double f_test4(double x) {
 	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
 }
