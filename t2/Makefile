@@ -5,6 +5,7 @@ BUILD_DIR:=build
 
 # Libs
 FIFO:=$(BUILD_DIR)/llfifo.o
+BAG:=$(BUILD_DIR)/bag.o $(FIFO)
 
 # Dependencies
 OBJ:=quad_equal.o quad_bag.o quad_bag_equal.o bag.o llfifo.o quadrature.o
@@ -28,6 +29,9 @@ quad_bag: $(BUILD_DIR)/quad_bag.o $(FIFO) $(BUILD_DIR)/quadrature.o
 tests: test_fifo test_quadrature test_mpi
 
 test_fifo: $(BUILD_DIR)/test_fifo.o $(FIFO)
+	gcc $^ -o $@ $(LDFLAGS)
+
+test_bag: $(BUILD_DIR)/test_bag.o $(BAG)
 	gcc $^ -o $@ $(LDFLAGS)
 
 test_quadrature: test_quadrature.c $(BUILD_DIR)/quadrature.o

@@ -16,3 +16,4 @@ void bag_init(bag_t * b, uint32_t initial_capacity);
 void bag_push(bag_t * b, interval_t i);
 bool bag_pop(bag_t * b, interval_t * i);
 void bag_free(bag_t * b);
+uint32_t bag_count(bag_t * b);
