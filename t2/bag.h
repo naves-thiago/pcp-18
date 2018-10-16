@@ -5,6 +5,7 @@
 typedef struct {
 	double start;
 	double end;
+	double area;
 } interval_t;
 
 typedef struct {
