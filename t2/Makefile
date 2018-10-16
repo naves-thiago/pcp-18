@@ -23,7 +23,7 @@ quad_equal: $(BUILD_DIR)/quad_equal.o $(BUILD_DIR)/quadrature.o
 quad_bag_equal: $(BUILD_DIR)/quad_bag_equal.o $(BUILD_DIR)/quadrature.o
 	mpicc $^ -o $@ $(LDFLAGS)
 
-quad_bag: $(BUILD_DIR)/quad_bag.o $(FIFO) $(BUILD_DIR)/quadrature.o
+quad_bag: $(BUILD_DIR)/quad_bag.o $(BUILD_DIR)/quadrature.o $(FIFO) $(BAG)
 	mpicc $^ -o $@ $(LDFLAGS)
 
 tests: test_fifo test_quadrature test_mpi
