@@ -4,10 +4,10 @@ all: pcp
 BUILD_DIR:=build
 
 # Libs
-FIFO:=$(BUILD_DIR)/fifo.o
+FIFO:=$(BUILD_DIR)/llfifo.o
 
 # Dependencies
-OBJ:=equal.o bag.o bag_equal.o fifo.o quadrature.o
+OBJ:=equal.o bag.o bag_equal.o llfifo.o quadrature.o
 OBJ:=$(addprefix $(BUILD_DIR)/, $(OBJ))
 DEP:=$(OBJ:.o=.d)
 
@@ -41,6 +41,6 @@ $(BUILD_DIR)/%.o:%.c
 	mpicc -Wall -g -c -O2 -std=c99 -MMD $< -o $@
 
 clean:
-	rm -f $(OBJ) $(DEP) pcp test_fifo equal bag_equal
+	rm -f $(OBJ) $(DEP) pcp test_fifo equal bag_equal test_quadrature test_mpi
 
 -include $(DEP)
