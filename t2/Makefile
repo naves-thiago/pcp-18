@@ -7,7 +7,7 @@ BUILD_DIR:=build
 FIFO:=$(BUILD_DIR)/llfifo.o
 
 # Dependencies
-OBJ:=equal.o bag.o bag_equal.o llfifo.o quadrature.o
+OBJ:=quad_equal.o quad_bag.o quad_bag_equal.o bag.o llfifo.o quadrature.o
 OBJ:=$(addprefix $(BUILD_DIR)/, $(OBJ))
 DEP:=$(OBJ:.o=.d)
 
@@ -16,13 +16,13 @@ LDFLAGS:=-Wall -g -lm
 
 .PHONY: clean tests
 
-equal: $(BUILD_DIR)/equal.o $(BUILD_DIR)/quadrature.o
+quad_equal: $(BUILD_DIR)/quad_equal.o $(BUILD_DIR)/quadrature.o
 	mpicc $^ -o $@ $(LDFLAGS)
 
-bag_equal: $(BUILD_DIR)/bag_equal.o $(BUILD_DIR)/quadrature.o
+quad_bag_equal: $(BUILD_DIR)/quad_bag_equal.o $(BUILD_DIR)/quadrature.o
 	mpicc $^ -o $@ $(LDFLAGS)
 
-bag: $(BUILD_DIR)/bag.o $(FIFO) $(BUILD_DIR)/quadrature.o
+quad_bag: $(BUILD_DIR)/quad_bag.o $(FIFO) $(BUILD_DIR)/quadrature.o
 	mpicc $^ -o $@ $(LDFLAGS)
 
 tests: test_fifo test_quadrature test_mpi
@@ -41,6 +41,6 @@ $(BUILD_DIR)/%.o:%.c
 	mpicc -Wall -g -c -O2 -std=c99 -MMD $< -o $@
 
 clean:
-	rm -f $(OBJ) $(DEP) pcp test_fifo equal bag_equal test_quadrature test_mpi
+	rm -f $(OBJ) $(DEP) pcp test_fifo quad_equal quad_bag_equal quad_bag test_quadrature test_mpi
 
 -include $(DEP)
