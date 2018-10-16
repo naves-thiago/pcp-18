@@ -45,6 +45,6 @@ $(BUILD_DIR)/%.o:%.c
 	mpicc -Wall -g -c -O2 -std=c99 -MMD $< -o $@
 
 clean:
-	rm -f $(OBJ) $(DEP) pcp test_fifo quad_equal quad_bag_equal quad_bag test_quadrature test_mpi
+	rm -f $(OBJ) $(DEP) pcp test_fifo quad_equal quad_bag_equal quad_bag test_quadrature test_mpi test_bag
 
 -include $(DEP)
