@@ -3,9 +3,9 @@
 #include <stdbool.h>
 
 typedef struct {
+	double area;
 	double start;
 	double end;
-	double area;
 } interval_t;
 
 typedef struct {

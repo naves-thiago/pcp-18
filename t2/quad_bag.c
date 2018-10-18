@@ -10,8 +10,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-//#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
-#define debug_print(...)
+#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+//#define debug_print(...)
 
 /**
  * @brief This struct stores a test function pointer
@@ -31,9 +31,11 @@ typedef struct {
 	int id;
 } waiting_t;
 
+static MPI_Datatype mpi_interval_type;
+
 static double f_test4(double x) {
-	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
-//	return 1;
+//	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
+	return 1;
 }
 
 /**
@@ -98,10 +100,10 @@ void main_master(unsigned intervals) {
 	double area = 0;
 
 	interval_t interval;
+	interval.area = 0;
 	for (unsigned i=0; i<intervals-1; i++) {
 		interval.start = a;
 		interval.end = a + step;
-		interval.area = 0;
 		bag_push(&bag, interval);
 		a += step;
 	}
@@ -116,66 +118,61 @@ void main_master(unsigned intervals) {
 	// (start != 0 || end != 0, area disregarded).
 	// If an interval is available in the bag, the master replies with the
 	// area (previous calculation), interval start and interval end.
-	double data[3];
+	//double data[3];
 	while (llFifoCount(&waiting) < num_workers || bag_count(&bag)) {
 		MPI_Status status;
-		recv(data, 3, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-		debug_print("Master {%f, %f, %f}\n", data[0], data[1], data[2]);
+		recv(&interval, 1, mpi_interval_type, MPI_ANY_SOURCE, 0,
+		     MPI_COMM_WORLD, &status);
+		debug_print("Master {%f, %f, %f}\n", interval.area, interval.start,
+		            interval.end);
 
-		if (data[1] != 0 || data[2] != 0) {
-			interval.area  = data[0];
-			interval.start = data[1];
-			interval.end   = data[2];
+		if (interval.start != 0 || interval.end != 0) {
 			bag_push(&bag, interval);
 		}
 		else {
 			// Did not send an interval -> worker is done
-			area += data[0];
+			area += interval.area;
 			llFifoPush(&waiting, (LLFifoItem *)&wait_handles[status.MPI_SOURCE-1]);
 		}
 
 		if (llFifoCount(&waiting) && bag_pop(&bag, &interval)) {
 			waiting_t * w = (waiting_t *)llFifoPop(&waiting);
-			data[0] = interval.area;
-			data[1] = interval.start;
-			data[2] = interval.end;
-			send(data, 3, MPI_DOUBLE, w->id, 0, MPI_COMM_WORLD);
+			send(&interval, 1, mpi_interval_type, w->id, 0, MPI_COMM_WORLD);
 		}
 	}
 
 	// Done. Signal workers to stop
 	debug_print("Master done\n");
-	data[0] = 0;
-	data[1] = 0;
-	data[2] = 0;
+	interval.area = 0;
+	interval.start = 0;
+	interval.end = 0;
 	for (int i=1; i<=num_workers; i++)
-		send(data, 3, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+		send(&interval, 1, mpi_interval_type, i, 0, MPI_COMM_WORLD);
 
 	printf("Area: %.16f\n", area);
 }
 
 void main_worker(void) {
-	double data[3]; // area, start, end
-	data[0] = 0;
-	data[1] = 0;
-	data[2] = 0;
-
-	//error();
+	interval_t interval;
+	interval.area = 0;
+	interval.start = 0;
+	interval.end = 0;
 
 	// Send interval [0, 0] to receive the first interval
 	// and area 0 to not affect the sum
-	send(data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+	send(&interval, 1, mpi_interval_type, 0, 0, MPI_COMM_WORLD);
 
 	while(1) {
-		recv(data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		if (data[1] == 0 && data[2] == 0)
+		recv(&interval, 1, mpi_interval_type, 0, 0, MPI_COMM_WORLD,
+		     MPI_STATUS_IGNORE);
+		if (interval.start == 0 && interval.end == 0)
 			return;
 
-		debug_print("Worker: [%f, %f]\n", data[1], data[2]);
+		debug_print("Worker: [%f, %f]\n", interval.start, interval.end);
 
-		double area = data[0];
-		double a = data[1];
-		double b = data[2];
+		double area = interval.area;
+		double a = interval.start;
+		double b = interval.end;
 
 		while (1) {
 			double mid = (a + b) / 2.0;
@@ -183,25 +180,27 @@ void main_worker(void) {
 			double area_right = calc_area(test->f, mid, b);
 			double area_lr = area_left + area_right;
 			if (fabs(area - area_lr) <= precision) {
-				data[0] = area_lr;
-				data[1] = 0;
-				data[2] = 0;
+				interval.area = area_lr;
+				interval.start = 0;
+				interval.end = 0;
 				debug_print("Worker: area = %f\n", area_lr);
 				break;
 			}
 			else {
-				data[0] = area_right;
-				data[1] = mid;
-				data[2] = b;
-				debug_print("Inter {%f, %f, %f}\n", data[0], data[1], data[2]);
-				send(&data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+				interval.area = area_right;
+				interval.start = mid;
+				interval.end = b;
+				debug_print("Inter {%f, %f, %f}\n", interval.area,
+				            interval.start, interval.end);
+				send(&interval, 1, mpi_interval_type, 0, 0, MPI_COMM_WORLD);
 				b = mid;
 				area = area_left;
 			}
 		}
 
-		debug_print("Worker {%f, %f, %f}\n", data[0], data[1], data[2]);
-		send(&data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+		debug_print("Worker {%f, %f, %f}\n", interval.area,
+		            interval.start, interval.end);
+		send(&interval, 1, mpi_interval_type, 0, 0, MPI_COMM_WORLD);
 		debug_print("Worker sent area\n");
 	}
 }
@@ -223,6 +222,16 @@ int main(int argc, char ** argv) {
 	test = &tests[test_id];
 	int procid;
 	MPI_Init(&argc, &argv);
+
+	// Create the message_t type in MPI
+	//MPI_Datatype types[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE};
+	int offsets[3];
+	offsets[0] = offsetof(interval_t, area);
+	offsets[1] = offsetof(interval_t, start);
+	offsets[2] = offsetof(interval_t, end);
+	MPI_Type_create_indexed_block(3, 1, offsets, MPI_DOUBLE, &mpi_interval_type);
+	MPI_Type_commit(&mpi_interval_type);
+
 	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
 	if (procid == 0)
 		main_master(intervals);
