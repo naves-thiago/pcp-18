@@ -1,4 +1,4 @@
-all: pcp
+all: quad_bag
 
 # Object output dir
 BUILD_DIR:=build
@@ -14,6 +14,7 @@ DEP:=$(OBJ:.o=.d)
 
 # Flags
 LDFLAGS:=-Wall -g -lm
+CFLAGS:=-Wall -g -O0 -std=c99 -MMD
 
 .PHONY: clean tests
 
@@ -42,9 +43,9 @@ test_mpi: test_mpi.c
 
 $(BUILD_DIR)/%.o:%.c
 	@mkdir -p $(BUILD_DIR)
-	mpicc -Wall -g -c -O2 -std=c99 -MMD $< -o $@
+	mpicc -c $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(OBJ) $(DEP) pcp test_fifo quad_equal quad_bag_equal quad_bag test_quadrature test_mpi test_bag
+	rm -f $(OBJ) $(DEP) test_fifo quad_equal quad_bag_equal quad_bag test_quadrature test_mpi test_bag
 
 -include $(DEP)
