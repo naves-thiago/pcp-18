@@ -194,14 +194,14 @@ void main_worker(void) {
 				data[1] = mid;
 				data[2] = b;
 				debug_print("Inter {%f, %f, %f}\n", data[0], data[1], data[2]);
-				send(&data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+				send(data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
 				b = mid;
 				area = area_left;
 			}
 		}
 
 		debug_print("Worker {%f, %f, %f}\n", data[0], data[1], data[2]);
-		send(&data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+		send(data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
 		debug_print("Worker sent area\n");
 	}
 }
