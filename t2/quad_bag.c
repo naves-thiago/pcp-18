@@ -10,7 +10,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+//#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+#define debug_print(...)
 
 /**
  * @brief This struct stores a test function pointer
@@ -32,6 +33,7 @@ typedef struct {
 
 static double f_test4(double x) {
 	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
+//	return 1;
 }
 
 /**
@@ -81,9 +83,11 @@ void main_master(unsigned intervals) {
 	llFifoInit(&waiting);
 	waiting_t * wait_handles = (waiting_t *)malloc(num_workers * sizeof(waiting_t));
 	for (int i=0; i<num_workers; i++) {
-		wait_handles[i].id = i;
+		wait_handles[i].id = i+1;
 		//llFifoPush(&waiting, (LLFifoItem *)&wait_handles[i]);
 	}
+
+//	error();
 
 	bag_t bag;
 	bag_init(&bag, intervals);
@@ -116,6 +120,7 @@ void main_master(unsigned intervals) {
 	while (llFifoCount(&waiting) < num_workers || bag_count(&bag)) {
 		MPI_Status status;
 		recv(data, 3, MPI_DOUBLE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+		debug_print("Master {%f, %f, %f}\n", data[0], data[1], data[2]);
 
 		if (data[1] != 0 || data[2] != 0) {
 			interval.area  = data[0];
@@ -126,7 +131,7 @@ void main_master(unsigned intervals) {
 		else {
 			// Did not send an interval -> worker is done
 			area += data[0];
-			llFifoPush(&waiting, (LLFifoItem *)&wait_handles[status.MPI_SOURCE]);
+			llFifoPush(&waiting, (LLFifoItem *)&wait_handles[status.MPI_SOURCE-1]);
 		}
 
 		if (llFifoCount(&waiting) && bag_pop(&bag, &interval)) {
@@ -143,7 +148,7 @@ void main_master(unsigned intervals) {
 	data[0] = 0;
 	data[1] = 0;
 	data[2] = 0;
-	for (int i=1; num_workers; i++)
+	for (int i=1; i<=num_workers; i++)
 		send(data, 3, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
 
 	printf("Area: %.16f\n", area);
@@ -154,6 +159,8 @@ void main_worker(void) {
 	data[0] = 0;
 	data[1] = 0;
 	data[2] = 0;
+
+	//error();
 
 	// Send interval [0, 0] to receive the first interval
 	// and area 0 to not affect the sum
@@ -166,10 +173,11 @@ void main_worker(void) {
 
 		debug_print("Worker: [%f, %f]\n", data[1], data[2]);
 
+		double area = data[0];
+		double a = data[1];
+		double b = data[2];
+
 		while (1) {
-			double area = data[0];
-			double a = data[1];
-			double b = data[2];
 			double mid = (a + b) / 2.0;
 			double area_left = calc_area(test->f, a, mid);
 			double area_right = calc_area(test->f, mid, b);
@@ -182,14 +190,17 @@ void main_worker(void) {
 				break;
 			}
 			else {
-				data[0] = 0;
+				data[0] = area_right;
 				data[1] = mid;
 				data[2] = b;
+				debug_print("Inter {%f, %f, %f}\n", data[0], data[1], data[2]);
 				send(&data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
 				b = mid;
+				area = area_left;
 			}
 		}
 
+		debug_print("Worker {%f, %f, %f}\n", data[0], data[1], data[2]);
 		send(&data, 3, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
 		debug_print("Worker sent area\n");
 	}
