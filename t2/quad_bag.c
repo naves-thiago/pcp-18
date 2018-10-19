@@ -35,7 +35,6 @@ static MPI_Datatype mpi_interval_type;
 
 static double f_test4(double x) {
 	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
-//	return 1;
 }
 
 /**
@@ -86,10 +85,7 @@ void main_master(unsigned intervals) {
 	waiting_t * wait_handles = (waiting_t *)malloc(num_workers * sizeof(waiting_t));
 	for (int i=0; i<num_workers; i++) {
 		wait_handles[i].id = i+1;
-		//llFifoPush(&waiting, (LLFifoItem *)&wait_handles[i]);
 	}
-
-//	error();
 
 	bag_t bag;
 	bag_init(&bag, intervals);
@@ -112,13 +108,11 @@ void main_master(unsigned intervals) {
 	interval.end = test->end;
 	bag_push(&bag, interval);
 
-	// Worker message format: area, interval start, interval end (all doubles)
 	// Each worker sends a messase to either request an interval / send the
 	// calculated area (start = end = 0) or send an interval to add to the bag
 	// (start != 0 || end != 0, area disregarded).
 	// If an interval is available in the bag, the master replies with the
 	// area (previous calculation), interval start and interval end.
-	//double data[3];
 	while (llFifoCount(&waiting) < num_workers || bag_count(&bag)) {
 		MPI_Status status;
 		recv(&interval, 1, mpi_interval_type, MPI_ANY_SOURCE, 0,
@@ -173,7 +167,6 @@ void main_worker(void) {
 		double area = interval.area;
 		double a = interval.start;
 		double b = interval.end;
-
 		while (1) {
 			double mid = (a + b) / 2.0;
 			double area_left = calc_area(test->f, a, mid);
