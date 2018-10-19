@@ -36,7 +36,7 @@ void main_master(void) {
 		else
 			interval[1] = test->end; // Avoid rounding error
 
-		if (MPI_Send(&interval, 2, MPI_DOUBLE, i, 0, MPI_COMM_WORLD) != MPI_SUCCESS)
+		if (MPI_Send(interval, 2, MPI_DOUBLE, i, 0, MPI_COMM_WORLD) != MPI_SUCCESS)
 			MPI_Abort(MPI_COMM_WORLD, 1);
 		a += step;
 	}
