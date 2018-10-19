@@ -10,8 +10,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
-//#define debug_print(...)
+//#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+#define debug_print(...)
 
 /**
  * @brief This struct stores a test function pointer
@@ -34,8 +34,8 @@ typedef struct {
 static MPI_Datatype mpi_interval_type;
 
 static double f_test4(double x) {
-//	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
-	return 1;
+	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
+//	return 1;
 }
 
 /**
@@ -224,12 +224,13 @@ int main(int argc, char ** argv) {
 	MPI_Init(&argc, &argv);
 
 	// Create the message_t type in MPI
-	//MPI_Datatype types[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE};
-	int offsets[3];
+	int block_lens[3] = {1, 1, 1};
+	MPI_Datatype types[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE};
+	MPI_Aint offsets[3];
 	offsets[0] = offsetof(interval_t, area);
 	offsets[1] = offsetof(interval_t, start);
 	offsets[2] = offsetof(interval_t, end);
-	MPI_Type_create_indexed_block(3, 1, offsets, MPI_DOUBLE, &mpi_interval_type);
+	MPI_Type_create_struct(3, block_lens, offsets, types, &mpi_interval_type);
 	MPI_Type_commit(&mpi_interval_type);
 
 	MPI_Comm_rank(MPI_COMM_WORLD, &procid);
@@ -238,6 +239,7 @@ int main(int argc, char ** argv) {
 	else
 		main_worker();
 
+	MPI_Type_free(&mpi_interval_type);
 	MPI_Finalize();
 	return 0;
 }
