@@ -1,35 +1,12 @@
+#include "test_functions.h"
 #include "quadrature.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <mpi.h>
 #include <math.h>
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 #define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
-
-/**
- * @brief This struct stores a test function pointer
- * and the integration interval
- */
-typedef struct {
-	double start;
-	double end;
-	func_t f;
-} test_function_t;
-
-static double f_test4(double x) {
-	return x*sin(x)+x*x*sin(10*x+M_PI/8.0)+2*sin(13*x+M_PI/3.0)+(x+3)*(x+3)/4.0;
-}
-
-/**
- * @brief List of available tests (selected via the first command line argument)
- */
-static const test_function_t tests[] = {
-	{.start = -5, .end = 5, .f = f_test4}
-};
 
 /**
  * @brief User selected test
