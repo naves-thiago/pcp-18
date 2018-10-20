@@ -14,18 +14,20 @@ DEP:=$(OBJ:.o=.d)
 
 # Flags
 LDFLAGS:=-Wall -g -lm
-CFLAGS:=-Wall -g -O0 -std=c99 -MMD
+CFLAGS:= -Wall -g -O2 -std=c99 -MMD
 
+#MPICC:=/home/thiago/dev/pcp/t2/mpi/bin/mpicc -Wl,-rpath -Wl,/usr/lib64/openmpi/lib
+MPICC:=mpicc
 .PHONY: clean tests
 
 quad_equal: $(BUILD_DIR)/quad_equal.o $(BUILD_DIR)/quadrature.o
-	mpicc $^ -o $@ $(LDFLAGS)
+	$(MPICC) $^ -o $@ $(LDFLAGS)
 
 quad_bag_equal: $(BUILD_DIR)/quad_bag_equal.o $(BUILD_DIR)/quadrature.o
-	mpicc $^ -o $@ $(LDFLAGS)
+	$(MPICC) $^ -o $@ $(LDFLAGS)
 
 quad_bag: $(BUILD_DIR)/quad_bag.o $(BUILD_DIR)/quadrature.o $(FIFO) $(BAG)
-	mpicc $^ -o $@ $(LDFLAGS)
+	$(MPICC) $^ -o $@ $(LDFLAGS)
 
 tests: test_fifo test_quadrature test_mpi
 
@@ -39,11 +41,11 @@ test_quadrature: test_quadrature.c $(BUILD_DIR)/quadrature.o
 	gcc $^ -o $@ $(LDFLAGS)
 
 test_mpi: test_mpi.c
-	mpicc $(LDFLAGS) $^ -o $@
+	$(MPICC) $(LDFLAGS) $^ -o $@
 
-$(BUILD_DIR)/%.o:%.c
+$(BUILD_DIR)/%.o: %.c Makefile
 	@mkdir -p $(BUILD_DIR)
-	mpicc -c $(CFLAGS) $< -o $@
+	$(MPICC) -c $(CFLAGS) $< -o $@
 
 clean:
 	rm -f $(OBJ) $(DEP) test_fifo quad_equal quad_bag_equal quad_bag test_quadrature test_mpi test_bag
