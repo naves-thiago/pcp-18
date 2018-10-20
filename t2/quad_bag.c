@@ -8,8 +8,11 @@
 #include <mpi.h>
 #include <math.h>
 
-//#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+#ifdef DEBUG
+#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+#else
 #define debug_print(...)
+#endif
 
 /**
  * @brief This struct stores the id of a waiting worker in the FIFO

@@ -5,7 +5,11 @@
 #include <mpi.h>
 #include <math.h>
 
-#define debug_print(...) printf(__VA_ARGS__)
+#ifdef DEBUG
+#define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+#else
+#define debug_print(...)
+#endif
 
 /**
  * @brief If true, the master process will also integrate the function

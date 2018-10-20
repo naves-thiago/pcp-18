@@ -6,7 +6,11 @@
 #include <mpi.h>
 #include <math.h>
 
+#ifdef DEBUG
 #define debug_print(...) do {printf(__VA_ARGS__); fflush(stdout); } while (0);
+#else
+#define debug_print(...)
+#endif
 
 /**
  * @brief User selected test
