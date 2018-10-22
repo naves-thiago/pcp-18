@@ -29,9 +29,9 @@ static double f1(double x) {
 }
 
 static double f2(double x) {
-// sum[0.1*cos(x*y^2/40), {y,0,10}] ; x=-30..30
+// sum[0.1*cos(x*y^2/40), {y,0,100}] ; x=-10..10
 	double tmp =  0;
-	for (int y=0; y<=50; y++)
+	for (int y=0; y<=100; y++)
 		tmp += 0.1*cos(x*y*y/40.0);
 	return tmp;
 }
