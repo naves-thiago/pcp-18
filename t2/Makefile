@@ -1,4 +1,4 @@
-all: quad_bag
+all: quad_bag quad_equal quad_bag_equal
 
 # Object output dir
 BUILD_DIR:=build
