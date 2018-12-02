@@ -1,0 +1,5 @@
+build/*
+mpi_tsp_dyn
+tsp
+cscope.out
+ch6/*
