@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <mpi.h>
 #include "timer.h"
 #include "queue.h"
@@ -46,6 +47,8 @@ int min_split_sz;
 stack_request_t stack_request;
 tour_t best_tour;
 pthread_mutex_t best_tour_mutex;
+int waiting;
+pthread_mutex_t waiting_mutex;
 
 void Usage(char* prog_name);
 
@@ -70,13 +73,20 @@ void My_barrier(my_barrier_t bar);
 void Split_stack(my_stack_t stack, my_stack_t dst_stack,
       long my_rank);
 
-void Send_work_if_needed(my_stack_t stack, int my_rank);
-
 int  Best_tour(tour_t tour);
 void Update_best_tour(tour_t tour);
 int  Feasible(tour_t tour, city_t city);
 
 /******************************************************************/
+
+void gdb(void) {
+	volatile int i = 0;
+	printf("PID %d ready for attach\n", getpid());
+	fflush(stdout);
+	while (i==0) {
+		sleep(5);
+	}
+}
 
 int main(int argc, char* argv[]) {
    double start, finish;
@@ -94,10 +104,9 @@ int main(int argc, char* argv[]) {
       fprintf(stderr, "Thread count must be positive\n");
       Usage(argv[0]);
    }
-   n = Read_digraph(argv[2], argv[0]);
-#  ifdef DEBUG
-   Print_digraph();
-#  endif
+   n = Read_digraph(argv[2]);
+   if (n <= 0)
+      Usage(argv[0]);
 
    min_split_sz = strtol(argv[3], NULL, 10);
    if (min_split_sz <= 0) {
@@ -109,14 +118,10 @@ int main(int argc, char* argv[]) {
    thread_infos = malloc(proc_threads*sizeof(thread_info_t));
    bar_str = My_barrier_init(proc_threads);
    pthread_mutex_init(&best_tour_mutex, NULL);
+   pthread_mutex_init(&waiting_mutex, NULL);
 
    best_tour = Alloc_tour(NULL, n);
    Init_tour(best_tour, INFINITY);
-#  ifdef DEBUG
-   Print_tour(-1, best_tour, "Best tour");
-   printf("City count = %d\n",  City_count(best_tour));
-   printf("Cost = %d\n\n", Tour_cost(best_tour));
-#  endif
 
    GET_TIME(start);
    for (thread = 0; thread < proc_threads; thread++) {
@@ -144,6 +149,7 @@ int main(int argc, char* argv[]) {
    free(thread_handles);
    Free_digraph();
    My_barrier_destroy(bar_str);
+   pthread_mutex_destroy(&waiting_mutex);
    pthread_mutex_destroy(&best_tour_mutex);
    MPI_Finalize();
    return 0;
@@ -157,7 +163,7 @@ int main(int argc, char* argv[]) {
  * In arg:    prog_name
  */
 void Usage(char* prog_name) {
-   fprintf(stderr, "usage: mpirun -n <procs> %s <thread_count>"
+   fprintf(stderr, "usage: mpirun -n <procs> %s <thread_count> "
                    "<digraph file> <min split size>\n",
          prog_name);
    MPI_Finalize();
@@ -187,6 +193,17 @@ void Send_work_if_needed(my_stack_t stack, int my_rank) {
  *    stack:    thread stack
  */
 void Request_work(my_stack_t stack) {
+   pthread_mutex_lock(&waiting_mutex);
+   waiting ++;
+   pthread_mutex_unlock(&waiting_mutex);
+
+   if (waiting == proc_threads) {
+      pthread_mutex_lock(&stack_request.cond_mutex);
+      pthread_cond_signal(&stack_request.cond);
+      pthread_mutex_unlock(&stack_request.cond_mutex);
+      return;
+   }
+
    // Wait to be able to request
    pthread_mutex_lock(&stack_request.stack_mutex);
    // Request
@@ -198,6 +215,10 @@ void Request_work(my_stack_t stack) {
    stack_request.stack = NULL;
    pthread_mutex_unlock(&stack_request.cond_mutex);
    pthread_mutex_unlock(&stack_request.stack_mutex);
+
+   pthread_mutex_lock(&waiting_mutex);
+   waiting --;
+   pthread_mutex_unlock(&waiting_mutex);
 }
 
 /*------------------------------------------------------------------
@@ -239,6 +260,7 @@ void* Par_tree_search(void* rank) {
    Partition_tree(my_rank, stack);
 
    while ((curr_tour = Get_work(stack))) {
+      Send_work_if_needed(stack, my_rank);
       if (City_count(curr_tour) == n) {
          if (Best_tour(curr_tour)) {
             Update_best_tour(curr_tour);
@@ -278,7 +300,7 @@ void Partition_tree(long my_rank, my_stack_t stack) {
 
    if (my_rank == 0) queue_size = Get_upper_bd_queue_sz();
    My_barrier(bar_str); // TODO: Only used in this function
-   dbg_printf("Th %ld > queue_size = %d\n", my_rank, queue_size);
+   printf("Th %ld > queue_size = %d\n", my_rank, queue_size);
 
    if (queue_size == 0) pthread_exit(NULL);
 
@@ -286,13 +308,13 @@ void Partition_tree(long my_rank, my_stack_t stack) {
    My_barrier(bar_str);
    Set_init_tours(my_rank, &my_first_tour, &my_last_tour);
 
-   dbg_printf("Th %ld > init_tour_count = %d, first = %d, last = %d\n", 
+   printf("Th %ld > init_tour_count = %d, first = %d, last = %d\n", 
          my_rank, init_tour_count, my_first_tour, my_last_tour);
 
    for (i = my_last_tour; i >= my_first_tour; i--) {
-#ifdef DEBUG
+
       Print_tour(my_rank, Queue_elt(queue,i), "About to push");
-#endif
+
       Push(stack, Queue_elt(queue,i));
    }
    Print_stack(stack, my_rank, "After set up");
@@ -478,26 +500,22 @@ void My_barrier(my_barrier_t bar) {
 void Split_stack(my_stack_t stack, my_stack_t dst_stack, long my_rank) {
    int new_src, new_dest, old_src, old_dest;
 
-#  ifdef TERM_DEBUG
    Print_stack(stack, my_rank, "Original old stack");
-#  endif
 
    new_dest = 0;
    old_dest = 1;
    for (new_src = 1; new_src < stack->list_sz; new_src += 2) {
       old_src = new_src+1;
       dst_stack->list[new_dest++] = stack->list[new_src];
-      if (old_src < stack->list_sz) 
+      if (old_src < stack->list_sz)
          stack->list[old_dest++] = stack->list[old_src];
    }
 
    stack->list_sz = old_dest;
    dst_stack->list_sz = new_dest;
 
-#  ifdef TERM_DEBUG
    Print_stack(stack, my_rank, "Updated old stack");
    Print_stack(dst_stack, my_rank, "New stack");
-#  endif
 }  /* Split_stack */
 
 /*------------------------------------------------------------------

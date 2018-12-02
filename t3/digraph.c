@@ -14,21 +14,20 @@ int Cost(int city1, int city2) {
  * Purpose:   Read in the number of cities and the digraph of costs
  * In arg:
  *    fname:     digraph file name
- *    prog_name: executable name
  * Globals out:
  *    n:        the number of cities
  *    digraph:  the matrix file
  * Ret:
  *    The number of cities
  */
-int Read_digraph(char fname[], char prog_name[]) {
+int Read_digraph(char fname[]) {
    int i, j;
    FILE* digraph_file;
 
    digraph_file = fopen(fname, "r");
    if (digraph_file == NULL) {
       fprintf(stderr, "Can't open %s\n", fname);
-      Usage(prog_name);
+      return -1;
    }
 
    fscanf(digraph_file, "%d", &n);
@@ -51,6 +50,7 @@ int Read_digraph(char fname[], char prog_name[]) {
          }
       }
    fclose(digraph_file);
+   return n;
 }  /* Read_digraph */
 
 /*------------------------------------------------------------------
