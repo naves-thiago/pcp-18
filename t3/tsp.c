@@ -114,6 +114,8 @@ int main(int argc, char* argv[]) {
       Usage(argv[0]);
    }
 
+   stack_request.stack = NULL;
+
    thread_handles = malloc(proc_threads*sizeof(pthread_t));
    thread_infos = malloc(proc_threads*sizeof(thread_info_t));
    bar_str = My_barrier_init(proc_threads);
@@ -152,6 +154,7 @@ int main(int argc, char* argv[]) {
    pthread_mutex_destroy(&waiting_mutex);
    pthread_mutex_destroy(&best_tour_mutex);
    MPI_Finalize();
+   Free_queue(queue);  // TODO find the best place for this
    return 0;
 }  /* main */
 
@@ -230,8 +233,10 @@ void Request_work(my_stack_t stack) {
  * Ret val:     Next tour
  */
 tour_t Get_work(my_stack_t stack) {
-   if (Empty_stack(stack))
+   if (Empty_stack(stack)) {
       Request_work(stack);
+      Print(stack, 9, "Received");
+   }
 
    return Pop(stack);
 }
@@ -276,7 +281,7 @@ void* Par_tree_search(void* rank) {
       Free_tour(curr_tour, avail);
    }
    Free_stack(avail);
-   if (my_rank == 0) Free_queue(queue);
+   //if (my_rank == 0) Free_queue(queue);
 
    return NULL;
 }  /* Par_tree_search */

@@ -292,7 +292,6 @@ void Free_stack(my_stack_t stack) {
  * In args:   all
  */
 void Print_stack(my_stack_t stack, long my_rank, char title[]) {
-#ifdef DEBUG
    char string[MAX_STRING];
    int i, j;
 
@@ -303,7 +302,6 @@ void Print_stack(my_stack_t stack, long my_rank, char title[]) {
          sprintf(string + strlen(string), "%d ", stack->list[i]->cities[j]);
       printf("%s\n", string);
    }
-#endif
 }  /* Print_stack */
 
 
