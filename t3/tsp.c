@@ -49,13 +49,14 @@ stack_request_t stack_request;
 tour_t best_tour;
 pthread_mutex_t best_tour_mutex;
 int running_threads;
-pthread_mutex_t waiting_mutex;
+pthread_mutex_t running_mutex;
+thread_info_t* thread_infos;
 
 void Usage(char* prog_name);
 
 void Send_work_if_needed(my_stack_t stack, int my_rank);
-void Request_work(my_stack_t stack);
-tour_t Get_work(my_stack_t stack);
+void Request_work(my_stack_t stack, long my_rank);
+tour_t Get_work(my_stack_t stack, long my_rank);
 void* Par_tree_search(void* rank);
 
 void Partition_tree(long my_rank, my_stack_t stack);
@@ -93,7 +94,6 @@ int main(int argc, char* argv[]) {
    double start, finish;
    long thread;
    pthread_t* thread_handles;
-   thread_info_t* thread_infos;
 
    MPI_Init(&argc, &argv);
    MPI_Comm_rank(MPI_COMM_WORLD, &proc_id);
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
    thread_infos = malloc(proc_threads*sizeof(thread_info_t));
    bar_str = My_barrier_init(proc_threads);
    pthread_mutex_init(&best_tour_mutex, NULL);
-   pthread_mutex_init(&waiting_mutex, NULL);
+   pthread_mutex_init(&running_mutex, NULL);
 
    best_tour = Alloc_tour(NULL, n);
    Init_tour(best_tour, INFINITY);
@@ -153,7 +153,7 @@ int main(int argc, char* argv[]) {
    free(thread_handles);
    Free_digraph();
    My_barrier_destroy(bar_str);
-   pthread_mutex_destroy(&waiting_mutex);
+   pthread_mutex_destroy(&running_mutex);
    pthread_mutex_destroy(&best_tour_mutex);
    pthread_mutex_destroy(&stack_request.cond_mutex);
    pthread_mutex_destroy(&stack_request.stack_mutex);
@@ -201,10 +201,10 @@ void Send_work_if_needed(my_stack_t stack, int my_rank) {
  * Out arg:
  *    stack:    thread stack
  */
-void Request_work(my_stack_t stack) {
-   pthread_mutex_lock(&waiting_mutex);
+void Request_work(my_stack_t stack, long my_rank) {
+   pthread_mutex_lock(&running_mutex);
    running_threads --;
-   pthread_mutex_unlock(&waiting_mutex);
+   pthread_mutex_unlock(&running_mutex);
 
    if (running_threads == 0) {
       pthread_mutex_lock(&stack_request.cond_mutex);
@@ -231,9 +231,9 @@ void Request_work(my_stack_t stack) {
 
    // Check if this thread is done
    if (!Empty_stack(stack)) {
-      pthread_mutex_lock(&waiting_mutex);
+      pthread_mutex_lock(&running_mutex);
       running_threads ++;
-      pthread_mutex_unlock(&waiting_mutex);
+      pthread_mutex_unlock(&running_mutex);
    }
 
    // Free the request
@@ -249,10 +249,10 @@ void Request_work(my_stack_t stack) {
  *    stack:    thread stack
  * Ret val:     Next tour
  */
-tour_t Get_work(my_stack_t stack) {
+tour_t Get_work(my_stack_t stack, long my_rank) {
    if (Empty_stack(stack)) {
-      Request_work(stack);
-      Print_stack(stack, 9, "Received");
+      Request_work(stack, my_rank);
+      Print_stack(stack, my_rank, "Received");
    }
 
    return Pop(stack);
@@ -278,16 +278,10 @@ void* Par_tree_search(void* rank) {
    tour_t curr_tour;
 
    avail = Init_stack(n);
-   //stack = Init_stack(n);
    Partition_tree(my_rank, stack);
 
-//   while (1) {
-   while ((curr_tour = Get_work(stack))) {
+   while ((curr_tour = Get_work(stack, my_rank))) {
       Send_work_if_needed(stack, my_rank);
-//      curr_tour = Get_work(stack);
-//      if (!curr_tour) {
-//         break;
-//      }
       if (City_count(curr_tour) == n) {
          if (Best_tour(curr_tour)) {
             Update_best_tour(curr_tour);
@@ -304,7 +298,6 @@ void* Par_tree_search(void* rank) {
    }
    Free_stack(avail);
    Free_stack(stack);
-   //if (my_rank == 0) Free_queue(queue);
 
    return NULL;
 }  /* Par_tree_search */
@@ -528,8 +521,8 @@ void My_barrier(my_barrier_t bar) {
 void Split_stack(my_stack_t stack, my_stack_t dst_stack, long my_rank) {
    int new_src, new_dest, old_src, old_dest;
 
-   Print_stack(stack, my_rank, "Original old stack");
-   Print_stack(dst_stack, my_rank, "Original dst stack");
+   //Print_stack(stack, my_rank, "Original old stack");
+   //Print_stack(dst_stack, my_rank, "Original dst stack");
    if (dst_stack->list_sz != 0) {
       printf("Split stack panic!\n");
       raise(SIGINT);
@@ -547,8 +540,8 @@ void Split_stack(my_stack_t stack, my_stack_t dst_stack, long my_rank) {
    stack->list_sz = old_dest;
    dst_stack->list_sz = new_dest;
 
-   Print_stack(stack, my_rank, "Updated old stack");
-   Print_stack(dst_stack, my_rank, "New stack");
+   //Print_stack(stack, my_rank, "Updated old stack");
+   //Print_stack(dst_stack, my_rank, "New stack");
 }  /* Split_stack */
 
 /*------------------------------------------------------------------

@@ -198,7 +198,7 @@ void Push(my_stack_t stack, tour_t tour) {
    } else {
       dbg_printf("In Push, list_sz = %d, pushing %p and %p\n",
             stack->list_sz, tour, tour->cities);
-      Print_tour(-1, tour, "About to be pushed onto stack");
+      //Print_tour(-1, tour, "About to be pushed onto stack");
       dbg_printf("\n");
 
       stack->list[stack->list_sz] = tour;
@@ -240,8 +240,6 @@ tour_t Pop(my_stack_t stack) {
    tour_t tmp;
 
    if (stack->list_sz == 0) {
-      //fprintf(stderr, "Trying to pop empty stack!\n");
-      //exit(-1);
       return NULL;
    }
    tmp = stack->list[stack->list_sz-1];
