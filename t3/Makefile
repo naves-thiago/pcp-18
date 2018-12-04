@@ -9,11 +9,12 @@ OBJ:=$(addprefix $(BUILD_DIR)/, $(OBJ))
 DEP:=$(OBJ:.o=.d)
 
 # Flags
-LDFLAGS:=-Wall -g
+LDFLAGS:=-Wall -g -lpthread
 CFLAGS:= -Wall -g -O2 -std=c99 -MMD
 
 #MPICC:=/home/thiago/dev/pcp/t2/mpi/bin/mpicc -Wl,-rpath -Wl,/usr/lib64/openmpi/lib
 MPICC:=mpicc
+#MPICC:=gcc
 .PHONY: clean
 
 tsp: $(OBJ)

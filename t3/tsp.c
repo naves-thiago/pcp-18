@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <mpi.h>
+#include <signal.h>
 #include "timer.h"
 #include "queue.h"
 #include "tour.h"
@@ -183,6 +184,7 @@ void Send_work_if_needed(my_stack_t stack, int my_rank) {
    if (stack_request.stack != NULL && stack->list_sz >= min_split_sz) {
       if (pthread_mutex_trylock(&stack_request.cond_mutex) == 0) {
          Split_stack(stack, stack_request.stack, my_rank);
+         stack_request.stack = NULL;
          pthread_cond_signal(&stack_request.cond);
          pthread_mutex_unlock(&stack_request.cond_mutex);
       }
@@ -215,7 +217,6 @@ void Request_work(my_stack_t stack) {
    pthread_mutex_lock(&stack_request.cond_mutex);
    pthread_cond_wait(&stack_request.cond, &stack_request.cond_mutex);
    // Free the request
-   stack_request.stack = NULL;
    pthread_mutex_unlock(&stack_request.cond_mutex);
    pthread_mutex_unlock(&stack_request.stack_mutex);
 
@@ -235,7 +236,7 @@ void Request_work(my_stack_t stack) {
 tour_t Get_work(my_stack_t stack) {
    if (Empty_stack(stack)) {
       Request_work(stack);
-      Print(stack, 9, "Received");
+      Print_stack(stack, 9, "Received");
    }
 
    return Pop(stack);
@@ -264,8 +265,13 @@ void* Par_tree_search(void* rank) {
    //stack = Init_stack(n);
    Partition_tree(my_rank, stack);
 
+//   while (1) {
    while ((curr_tour = Get_work(stack))) {
       Send_work_if_needed(stack, my_rank);
+//      curr_tour = Get_work(stack);
+//      if (!curr_tour) {
+//         break;
+//      }
       if (City_count(curr_tour) == n) {
          if (Best_tour(curr_tour)) {
             Update_best_tour(curr_tour);
@@ -281,6 +287,7 @@ void* Par_tree_search(void* rank) {
       Free_tour(curr_tour, avail);
    }
    Free_stack(avail);
+   Free_stack(stack);
    //if (my_rank == 0) Free_queue(queue);
 
    return NULL;
@@ -506,6 +513,11 @@ void Split_stack(my_stack_t stack, my_stack_t dst_stack, long my_rank) {
    int new_src, new_dest, old_src, old_dest;
 
    Print_stack(stack, my_rank, "Original old stack");
+   Print_stack(dst_stack, my_rank, "Original dst stack");
+   if (dst_stack->list_sz != 0) {
+      printf("Split stack panic!\n");
+      raise(SIGINT);
+   }
 
    new_dest = 0;
    old_dest = 1;
