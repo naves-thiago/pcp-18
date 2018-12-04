@@ -58,6 +58,8 @@ void Send_work_if_needed(my_stack_t stack, int my_rank);
 void Request_work(my_stack_t stack, long my_rank);
 tour_t Get_work(my_stack_t stack, long my_rank);
 void* Par_tree_search(void* rank);
+void* Proxy_send(void* p);
+void* Proxy_receive(void* p);
 
 void Partition_tree(long my_rank, my_stack_t stack);
 void Set_init_tours(long my_rank, int* my_first_tour_p,
@@ -94,8 +96,14 @@ int main(int argc, char* argv[]) {
    double start, finish;
    long thread;
    pthread_t* thread_handles;
+   int mpi_thread_level;
 
-   MPI_Init(&argc, &argv);
+   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mpi_thread_level);
+   if (mpi_thread_level != MPI_THREAD_MULTIPLE) {
+      printf("MPI Init thread failed\n");
+      MPI_Finalize();
+      return 0;
+   }
    MPI_Comm_rank(MPI_COMM_WORLD, &proc_id);
    MPI_Comm_size(MPI_COMM_WORLD, &procs);
 
@@ -177,6 +185,25 @@ void Usage(char* prog_name) {
    MPI_Finalize();
    exit(0);
 }  /* Usage */
+
+
+/*------------------------------------------------------------------
+ * Function:    Proxy_send
+ * Purpose:     Acts as a proxy to send work to other processes.
+ */
+void* Proxy_send(void* p) {
+
+}
+
+
+/*------------------------------------------------------------------
+ * Function:    Proxy_receive
+ * Purpose:     Acts as a proxy to receive work from other processes.
+ */
+void* Proxy_receive(void* p) {
+
+}
+
 
 /*------------------------------------------------------------------
  * Function:    Send_work_if_needed
