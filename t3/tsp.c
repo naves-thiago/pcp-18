@@ -37,7 +37,7 @@ typedef struct {
 /* Global Vars: */
 int n;  /* Number of cities in the problem */
 int proc_threads; /* Number of threads per process */
-int procs; /* Total number of processes */
+int procs = 1; /* Total number of processes */
 int proc_id; /* Process id */
 city_t home_town = 0;
 my_queue_t queue;
@@ -48,7 +48,7 @@ int min_split_sz;
 stack_request_t stack_request;
 tour_t best_tour;
 pthread_mutex_t best_tour_mutex;
-int waiting;
+int running_threads;
 pthread_mutex_t waiting_mutex;
 
 void Usage(char* prog_name);
@@ -126,6 +126,7 @@ int main(int argc, char* argv[]) {
    best_tour = Alloc_tour(NULL, n);
    Init_tour(best_tour, INFINITY);
 
+   running_threads = proc_threads;
    GET_TIME(start);
    for (thread = 0; thread < proc_threads; thread++) {
       thread_infos[thread].stack = Init_stack(n);
@@ -202,10 +203,10 @@ void Send_work_if_needed(my_stack_t stack, int my_rank) {
  */
 void Request_work(my_stack_t stack) {
    pthread_mutex_lock(&waiting_mutex);
-   waiting ++;
+   running_threads --;
    pthread_mutex_unlock(&waiting_mutex);
 
-   if (waiting == proc_threads) {
+   if (running_threads == 0) {
       pthread_mutex_lock(&stack_request.cond_mutex);
       pthread_cond_signal(&stack_request.cond);
       pthread_mutex_unlock(&stack_request.cond_mutex);
@@ -214,18 +215,30 @@ void Request_work(my_stack_t stack) {
 
    // Wait to be able to request
    pthread_mutex_lock(&stack_request.stack_mutex);
+
+   // Check if the program is done
+   if (running_threads == 0) {
+      pthread_mutex_unlock(&stack_request.stack_mutex);
+      return;
+   }
+
    // Request
    stack_request.stack = stack;
+
    // Wait for response
    pthread_mutex_lock(&stack_request.cond_mutex);
    pthread_cond_wait(&stack_request.cond, &stack_request.cond_mutex);
+
+   // Check if this thread is done
+   if (!Empty_stack(stack)) {
+      pthread_mutex_lock(&waiting_mutex);
+      running_threads ++;
+      pthread_mutex_unlock(&waiting_mutex);
+   }
+
    // Free the request
    pthread_mutex_unlock(&stack_request.cond_mutex);
    pthread_mutex_unlock(&stack_request.stack_mutex);
-
-   pthread_mutex_lock(&waiting_mutex);
-   waiting --;
-   pthread_mutex_unlock(&waiting_mutex);
 }
 
 /*------------------------------------------------------------------
