@@ -154,6 +154,9 @@ int main(int argc, char* argv[]) {
    My_barrier_destroy(bar_str);
    pthread_mutex_destroy(&waiting_mutex);
    pthread_mutex_destroy(&best_tour_mutex);
+   pthread_mutex_destroy(&stack_request.cond_mutex);
+   pthread_mutex_destroy(&stack_request.stack_mutex);
+   pthread_cond_destroy(&stack_request.cond);
    MPI_Finalize();
    Free_queue(queue);  // TODO find the best place for this
    return 0;
