@@ -302,4 +302,20 @@ void Print_stack(my_stack_t stack, long my_rank, char title[]) {
    }
 }  /* Print_stack */
 
-
+/*------------------------------------------------------------------
+ * Function:   Make_tour_from_msg
+ * Purpose:    Fills a tour_t struct with the cities from msg.
+ * msg format: msg[0] = count, msg[1..] cities
+ * In args:    msg
+ * Out args:   tour
+ */
+void Make_tour_from_msg(tour_t tour, int * msg) {
+   tour->count = msg[0];
+   tour->cost = 0;
+   msg ++;
+   tour->cities[0] = msg[0];
+   for (int i=1; i<tour->count; i++) {
+      tour->cities[i] = msg[i];
+      tour->cost += Cost(msg[i-1], msg[i]);
+   }
+}

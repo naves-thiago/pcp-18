@@ -28,9 +28,10 @@ tour_t Alloc_tour(my_stack_t avail, int length);
 void Free_tour(tour_t tour, my_stack_t avail);
 void Print_tour(long my_rank, tour_t tour, char* title);
 void Copy_tour(tour_t tour1, tour_t tour2);
-void Add_city(tour_t tour, city_t);
+void Add_city(tour_t tour, city_t new_city);
 void Remove_last_city(tour_t tour);
 int  Visited(tour_t tour, city_t city);
+void Make_tour_from_msg(tour_t tour, int * msg);
 
 
 my_stack_t Init_stack(int size);

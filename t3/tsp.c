@@ -14,6 +14,9 @@
 static const int INFINITY = 1000000;
 static const int FALSE = 0;
 static const int TRUE = 1;
+static const int TAG_DONE = 1;
+static const int TAG_BEST_TOUR = 2;
+static const int TAG_WORK = 3;
 
 typedef struct {
    int curr_tc;  // Number of threads that have entered the barrier
@@ -49,9 +52,9 @@ stack_request_t stack_request;
 tour_t best_tour;
 pthread_mutex_t best_tour_mutex;
 int running_threads;
+int running_procs;
 pthread_mutex_t running_mutex;
 thread_info_t* thread_infos;
-
 void Usage(char* prog_name);
 
 void Send_work_if_needed(my_stack_t stack, int my_rank);
@@ -78,7 +81,8 @@ void Split_stack(my_stack_t stack, my_stack_t dst_stack,
       long my_rank);
 
 int  Best_tour(tour_t tour);
-void Update_best_tour(tour_t tour);
+int  Update_best_tour_local(tour_t tour);
+void Update_best_tour_global(tour_t tour);
 int  Feasible(tour_t tour, city_t city);
 
 /******************************************************************/
@@ -189,19 +193,61 @@ void Usage(char* prog_name) {
 
 /*------------------------------------------------------------------
  * Function:    Proxy_send
- * Purpose:     Acts as a proxy to send work to other processes.
+ * Purpose:     Acts as a proxy to receive messages and send work to
+ *              other processes.
  */
-void* Proxy_send(void* p) {
+void* Proxy_receive_msg(void* p) {
+   while (!process_done) {
+      MPI_Status status;
+      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, &status);
+      switch (status.MPI_TAG) {
+         case TAG_DONE:
+            running_procs --;
+            int tmp;
+            MPI_Recv(&tmp, 1, MPI_INT, MPI_ANY_SOURCE, TAG_DONE, MPI_COMM_WORLD,
+                  MPI_STATUS_IGNORE);
+         break;
 
+         case TAG_BEST_TOUR:
+            tour_struct t;
+            
+         break;
+
+         case TAG_WORK:
+         break;
+
+         default:
+            printf("Unexpected TAG received\n");
+      }
+      MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      //...
+   }
+   return NULL;
 }
 
 
 /*------------------------------------------------------------------
  * Function:    Proxy_receive
- * Purpose:     Acts as a proxy to receive work from other processes.
+ * Purpose:     Acts as a proxy to receive messages from other processes.
  */
-void* Proxy_receive(void* p) {
-
+void* Proxy_request_work(void* p) {
+   while (running_procs > 1) {
+      if (stack_request.stack != NULL && running_threads == 0) {
+         if (pthread_mutex_trylock(&stack_request.cond_mutex) == 0) {
+            // MPI_Send ...
+            // MPI_Recv ...
+            // Copy received data to stack_request.stack
+            stack_request.stack = NULL;
+            pthread_cond_signal(&stack_request.cond);
+            pthread_mutex_unlock(&stack_request.cond_mutex);
+         }
+         else {
+            printf("Requesting work from another process would deadlock!\n");
+            while(1);
+         }
+      }
+   }
+   return NULL;
 }
 
 
@@ -592,16 +638,17 @@ int Best_tour(tour_t tour) {
 
 
 /*------------------------------------------------------------------
- * Function:    Update_best_tour
+ * Function:    Update_best_tour_local
  * Purpose:     Replace the existing best tour with the input tour +
  *              hometown
  * In arg:
  *    tour:     tour that's visited all n-cities
  * Global out:
  *    best_tour:  the current best tour
+ * Ret:         TRUE if the best tour was updated, FALSE otherwise.
  * Note:
  * 1. The input tour hasn't had the home_town added as the last
- *    city before the call to Update_best_tour.  So we call
+ *    city before the call to Update_best_tour_local.  So we call
  *    Add_city(best_tour, hometown) before returning.
  * 2. The call to Best_tour is necessary.  Without, we can get
  *    the following race:
@@ -620,14 +667,32 @@ int Best_tour(tour_t tour) {
  *        8                              Unlock mutex
  *
  */
-void Update_best_tour(tour_t tour) {
+int Update_best_tour_local(tour_t tour) {
+   int ret = FALSE;
    pthread_mutex_lock(&best_tour_mutex);
    if (Best_tour(tour)) {
       Copy_tour(tour, best_tour);
       Add_city(best_tour, home_town);
+      ret = TRUE;
    }
    pthread_mutex_unlock(&best_tour_mutex);
-}  /* Update_best_tour */
+   return ret;
+}  /* Update_best_tour_local */
+
+/*------------------------------------------------------------------
+ * Function:    Update_best_tour_global
+ * Purpose:     Replace the existing best tour with the input tour +
+ *              hometown and broadcast it to the other processes
+ * In arg:
+ *    tour:     tour that's visited all n-cities
+ * Global out:
+ *    best_tour:  the current best tour
+ */
+void Update_best_tour_global(tour_t tour) {
+   if (Update_best_tour_local(tour)) {
+      // TODO Broadcast
+   }
+}
 
 /*------------------------------------------------------------------
  * Function:  Feasible
