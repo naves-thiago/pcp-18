@@ -14,9 +14,9 @@
 static const int INFINITY = 1000000;
 static const int FALSE = 0;
 static const int TRUE = 1;
-static const int TAG_DONE = 1;
-static const int TAG_BEST_TOUR = 2;
-static const int TAG_WORK = 3;
+static const int TAG_DONE = 0;
+static const int TAG_BEST_TOUR = 1;
+//static const int TAG_WORK = 2;
 
 typedef struct {
    int curr_tc;  // Number of threads that have entered the barrier
@@ -38,32 +38,39 @@ typedef struct {
 } thread_info_t;
 
 /* Global Vars: */
-int n;  /* Number of cities in the problem */
+int n;            /* Number of cities in the problem */
 int proc_threads; /* Number of threads per process */
-int procs = 1; /* Total number of processes */
-int proc_id; /* Process id */
+int procs = 1;    /* Total number of processes */
+int proc_id;      /* Process id */
+int min_split_sz; /* Min stack size to allow a split */
 city_t home_town = 0;
+
 my_queue_t queue;
 int queue_size;
 int init_tour_count;
 my_barrier_t bar_str;
-int min_split_sz;
 stack_request_t stack_request;
 tour_t best_tour;
 pthread_mutex_t best_tour_mutex;
+
 int running_threads;
 int running_procs;
-int process_done;
 pthread_mutex_t running_mutex;
 thread_info_t* thread_infos;
+
+MPI_Comm comm_done;
+//MPI_Comm comm_work;
+#define comm_best MPI_COMM_WORLD
+pthread_t proxy_receive_msg_thread;
+
 void Usage(char* prog_name);
 
 void Send_work_if_needed(my_stack_t stack, int my_rank);
 void Request_work(my_stack_t stack, long my_rank);
 tour_t Get_work(my_stack_t stack, long my_rank);
 void* Par_tree_search(void* rank);
-void* Proxy_send(void* p);
-void* Proxy_receive(void* p);
+void* Proxy_receive_msg(void* p);
+void* Proxy_request_work(void* p);
 
 void Partition_tree(long my_rank, my_stack_t stack);
 void Set_init_tours(long my_rank, int* my_first_tour_p,
@@ -89,12 +96,12 @@ int  Feasible(tour_t tour, city_t city);
 /******************************************************************/
 
 void gdb(void) {
-	volatile int i = 0;
-	printf("PID %d ready for attach\n", getpid());
-	fflush(stdout);
-	while (i==0) {
-		sleep(5);
-	}
+   volatile int i = 0;
+   printf("PID %d ready for attach\n", getpid());
+   fflush(stdout);
+   while (i==0) {
+      sleep(5);
+   }
 }
 
 int main(int argc, char* argv[]) {
@@ -111,6 +118,8 @@ int main(int argc, char* argv[]) {
    }
    MPI_Comm_rank(MPI_COMM_WORLD, &proc_id);
    MPI_Comm_size(MPI_COMM_WORLD, &procs);
+   MPI_Comm_dup(MPI_COMM_WORLD, &comm_done);
+   //MPI_Comm_dup(MPI_COMM_WORLD, &comm_work);
 
    if (argc != 4) Usage(argv[0]);
    proc_threads = strtol(argv[1], NULL, 10);
@@ -171,11 +180,12 @@ int main(int argc, char* argv[]) {
    pthread_mutex_destroy(&stack_request.cond_mutex);
    pthread_mutex_destroy(&stack_request.stack_mutex);
    pthread_cond_destroy(&stack_request.cond);
-   MPI_Finalize();
+   MPI_Comm_free(&comm_done);
+   //MPI_Comm_free(&comm_work);
    Free_queue(queue);  // TODO find the best place for this
+   MPI_Finalize();
    return 0;
 }  /* main */
-
 
 
 /*------------------------------------------------------------------
@@ -198,42 +208,52 @@ void Usage(char* prog_name) {
  *              other processes.
  */
 void* Proxy_receive_msg(void* p) {
-   while (!process_done) {
-      MPI_Status status;
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-      switch (status.MPI_TAG) {
-         case TAG_DONE:
-         {
-            running_procs --;
-            int tmp;
-            MPI_Recv(&tmp, 1, MPI_INT, MPI_ANY_SOURCE, TAG_DONE, MPI_COMM_WORLD,
-                  MPI_STATUS_IGNORE);
-         }
-         break;
+   (void)p;
+   int req_index;
+   MPI_Request requests[2]; // 0-done, 1-best, 2-work
+   for (int i=0; i<2; i++)
+      requests[i] = MPI_REQUEST_NULL;
 
-         case TAG_BEST_TOUR:
-         {
-            tour_t t = Alloc_tour(NULL, n);
-            if (proc_id == 0) {
-               MPI_Recv(t->cities, n, MPI_INT, MPI_ANY_SOURCE, TAG_BEST_TOUR,
-                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            }
-            else {
-               MPI_Bcast(t->cities, n, MPI_INT, 0, MPI_COMM_WORLD);
-            }
+   int done_id;
+//   tour_struct ts;
+//   ts.cities = alloca((n+1) * sizeof(int));
+//   tour_t t = &ts;
+   tour_t t = Alloc_tour(NULL, n);
+   while (1) {
+      if (proc_id == 0) {
+         MPI_Irecv(t->cities, n, MPI_INT, MPI_ANY_SOURCE, TAG_BEST_TOUR,
+               comm_best, &requests[TAG_BEST_TOUR]);
+         MPI_Irecv(&done_id, 1, MPI_INT, MPI_ANY_SOURCE, TAG_DONE,
+               comm_done, &requests[TAG_DONE]);
+
+         MPI_Waitany(2, requests, &req_index, MPI_STATUS_IGNORE);
+         if (req_index == TAG_BEST_TOUR) {
+            Fix_tour_from_msg(t);
             Update_best_tour_global(t);
-            Free_tour(t, NULL);
          }
-         break;
-
-         case TAG_WORK:
-         break;
-
-         default:
-            printf("Unexpected TAG received\n");
+         else {
+            running_procs --;
+            if (running_procs == 0) {
+               MPI_Bcast(&proc_id, 1, MPI_INT, 0, comm_done);
+               break;
+            }
+         }
       }
-      //...
+      else {
+         MPI_Ibcast(t->cities, n, MPI_INT, 0, comm_best, &requests[TAG_BEST_TOUR]);
+         MPI_Ibcast(&done_id,  1, MPI_INT, 0, comm_done, &requests[TAG_DONE]);
+         MPI_Waitany(2, requests, &req_index, MPI_STATUS_IGNORE);
+         if (req_index == TAG_BEST_TOUR) {
+            Fix_tour_from_msg(t);
+            Update_best_tour_local(t);
+         }
+         else {
+            break;
+         }
+      }
    }
+
+   Free_tour(t, NULL);
    return NULL;
 }
 
@@ -280,6 +300,7 @@ void Send_work_if_needed(my_stack_t stack, int my_rank) {
    }
 }
 
+
 /*------------------------------------------------------------------
  * Function:    Request_work
  * Purpose:     Requests tours from other threads or processes.
@@ -304,6 +325,7 @@ void Request_work(my_stack_t stack, long my_rank) {
    // Check if the program is done
    if (running_threads == 0) {
       pthread_mutex_unlock(&stack_request.stack_mutex);
+      MPI_Send(&proc_id, 1, MPI_INT, 0, TAG_DONE, comm_done);
       return;
    }
 
@@ -703,9 +725,9 @@ int Update_best_tour_local(tour_t tour) {
 void Update_best_tour_global(tour_t tour) {
    if (Update_best_tour_local(tour)) {
       if (proc_id == 0)
-         MPI_Bcast(tour->cities, n, MPI_INT, 0, MPI_COMM_WORLD);
+         MPI_Bcast(tour->cities, n, MPI_INT, 0, comm_best);
       else
-         MPI_Send(tour->cities, n, MPI_INT, 0, TAG_BEST_TOUR, MPI_COMM_WORLD);
+         MPI_Send(tour->cities, n, MPI_INT, 0, TAG_BEST_TOUR, comm_best);
    }
 }
 
