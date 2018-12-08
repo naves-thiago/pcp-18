@@ -53,6 +53,7 @@ tour_t best_tour;
 pthread_mutex_t best_tour_mutex;
 int running_threads;
 int running_procs;
+int process_done;
 pthread_mutex_t running_mutex;
 thread_info_t* thread_infos;
 void Usage(char* prog_name);
@@ -199,18 +200,30 @@ void Usage(char* prog_name) {
 void* Proxy_receive_msg(void* p) {
    while (!process_done) {
       MPI_Status status;
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, &status);
+      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
       switch (status.MPI_TAG) {
          case TAG_DONE:
+         {
             running_procs --;
             int tmp;
             MPI_Recv(&tmp, 1, MPI_INT, MPI_ANY_SOURCE, TAG_DONE, MPI_COMM_WORLD,
                   MPI_STATUS_IGNORE);
+         }
          break;
 
          case TAG_BEST_TOUR:
-            tour_struct t;
-            
+         {
+            tour_t t = Alloc_tour(NULL, n);
+            if (proc_id == 0) {
+               MPI_Recv(t->cities, n, MPI_INT, MPI_ANY_SOURCE, TAG_BEST_TOUR,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
+            else {
+               MPI_Bcast(t->cities, n, MPI_INT, 0, MPI_COMM_WORLD);
+            }
+            Update_best_tour_global(t);
+            Free_tour(t, NULL);
+         }
          break;
 
          case TAG_WORK:
@@ -219,7 +232,6 @@ void* Proxy_receive_msg(void* p) {
          default:
             printf("Unexpected TAG received\n");
       }
-      MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       //...
    }
    return NULL;
@@ -357,7 +369,7 @@ void* Par_tree_search(void* rank) {
       Send_work_if_needed(stack, my_rank);
       if (City_count(curr_tour) == n) {
          if (Best_tour(curr_tour)) {
-            Update_best_tour(curr_tour);
+            Update_best_tour_global(curr_tour);
          }
       } else {
          for (nbr = n-1; nbr >= 1; nbr--)
@@ -690,7 +702,10 @@ int Update_best_tour_local(tour_t tour) {
  */
 void Update_best_tour_global(tour_t tour) {
    if (Update_best_tour_local(tour)) {
-      // TODO Broadcast
+      if (proc_id == 0)
+         MPI_Bcast(tour->cities, n, MPI_INT, 0, MPI_COMM_WORLD);
+      else
+         MPI_Send(tour->cities, n, MPI_INT, 0, TAG_BEST_TOUR, MPI_COMM_WORLD);
    }
 }
 
@@ -711,7 +726,7 @@ void Update_best_tour_global(tour_t tour) {
 int Feasible(tour_t tour, city_t city) {
    city_t last_city = Last_city(tour);
 
-   if (!Visited(tour, city) && 
+   if (!Visited(tour, city) &&
         Tour_cost(tour) + Cost(last_city,city) < Tour_cost(best_tour))
       return TRUE;
    else
