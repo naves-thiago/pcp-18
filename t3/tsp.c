@@ -161,13 +161,15 @@ int main(int argc, char* argv[]) {
       pthread_join(thread_handles[thread], NULL);
    GET_TIME(finish);
 
-   Print_tour(-1, best_tour, "Best tour");
-   printf("Cost = %d\n", best_tour->cost);
-   printf("Elapsed time = %e seconds\n", finish-start);
+   if (proc_id == 0) {
+      Print_tour(-1, best_tour, "Best tour");
+      printf("Cost = %d\n", best_tour->cost);
+      printf("Elapsed time = %e seconds\n", finish-start);
 
-#  ifdef STATS
-   printf("Stack splits = %d\n", stack_splits);
-#  endif
+#     ifdef STATS
+      printf("Stack splits = %d\n", stack_splits);
+#     endif
+   }
 
    free(best_tour->cities);
    free(best_tour);
@@ -384,6 +386,8 @@ void* Par_tree_search(void* rank) {
    my_stack_t avail;  // Stack for unused tours
    tour_t curr_tour;
 
+   //if (my_rank != 0)
+   //   gdb();
    avail = Init_stack(n);
    Partition_tree(my_rank, stack);
 
@@ -426,13 +430,13 @@ void* Par_tree_search(void* rank) {
 void Partition_tree(long my_rank, my_stack_t stack) {
    int my_first_tour, my_last_tour, i;
 
-   if (my_rank == 0) queue_size = Get_upper_bd_queue_sz();
+   if (my_rank % proc_threads == 0) queue_size = Get_upper_bd_queue_sz();
    My_barrier(bar_str); // TODO: Only used in this function
    printf("Th %ld > queue_size = %d\n", my_rank, queue_size);
 
    if (queue_size == 0) pthread_exit(NULL);
 
-   if (my_rank == 0) Build_initial_queue();
+   if (my_rank % proc_threads == 0) Build_initial_queue();
    My_barrier(bar_str);
    Set_init_tours(my_rank, &my_first_tour, &my_last_tour);
 
