@@ -121,6 +121,8 @@ int main(int argc, char* argv[]) {
    MPI_Comm_dup(MPI_COMM_WORLD, &comm_done);
    //MPI_Comm_dup(MPI_COMM_WORLD, &comm_work);
 
+   running_procs = procs;
+
    if (argc != 4) Usage(argv[0]);
    proc_threads = strtol(argv[1], NULL, 10);
    if (proc_threads <= 0) {
@@ -150,6 +152,8 @@ int main(int argc, char* argv[]) {
 
    running_threads = proc_threads;
    GET_TIME(start);
+   pthread_create(&proxy_receive_msg_thread, NULL, Proxy_receive_msg,
+         NULL);
    for (thread = 0; thread < proc_threads; thread++) {
       thread_infos[thread].stack = Init_stack(n);
       thread_infos[thread].rank = proc_id * proc_threads + thread;
@@ -159,6 +163,8 @@ int main(int argc, char* argv[]) {
 
    for (thread = 0; thread < proc_threads; thread++)
       pthread_join(thread_handles[thread], NULL);
+
+   pthread_join(proxy_receive_msg_thread, NULL);
    GET_TIME(finish);
 
    if (proc_id == 0) {
@@ -184,7 +190,7 @@ int main(int argc, char* argv[]) {
    pthread_cond_destroy(&stack_request.cond);
    MPI_Comm_free(&comm_done);
    //MPI_Comm_free(&comm_work);
-   Free_queue(queue);  // TODO find the best place for this
+   Free_queue(queue);
    MPI_Finalize();
    return 0;
 }  /* main */
@@ -217,9 +223,6 @@ void* Proxy_receive_msg(void* p) {
       requests[i] = MPI_REQUEST_NULL;
 
    int done_id;
-//   tour_struct ts;
-//   ts.cities = alloca((n+1) * sizeof(int));
-//   tour_t t = &ts;
    tour_t t = Alloc_tour(NULL, n);
    while (1) {
       if (proc_id == 0) {
@@ -230,13 +233,17 @@ void* Proxy_receive_msg(void* p) {
 
          MPI_Waitany(2, requests, &req_index, MPI_STATUS_IGNORE);
          if (req_index == TAG_BEST_TOUR) {
+            printf("%d > recv best\n", proc_id);
             Fix_tour_from_msg(t);
             Update_best_tour_global(t);
          }
          else {
             running_procs --;
+            printf("%d > recv done - %d running\n", proc_id, running_procs);
             if (running_procs == 0) {
-               MPI_Bcast(&proc_id, 1, MPI_INT, 0, comm_done);
+               MPI_Request req = MPI_REQUEST_NULL;
+               MPI_Ibcast(&proc_id, 1, MPI_INT, 0, comm_done, &req);
+               MPI_Wait(&req, MPI_STATUS_IGNORE);
                break;
             }
          }
@@ -246,10 +253,12 @@ void* Proxy_receive_msg(void* p) {
          MPI_Ibcast(&done_id,  1, MPI_INT, 0, comm_done, &requests[TAG_DONE]);
          MPI_Waitany(2, requests, &req_index, MPI_STATUS_IGNORE);
          if (req_index == TAG_BEST_TOUR) {
+            printf("%d > recv best\n", proc_id);
             Fix_tour_from_msg(t);
             Update_best_tour_local(t);
          }
          else {
+            printf("%d > recv done - %d running\n", proc_id, running_procs);
             break;
          }
       }
@@ -318,6 +327,8 @@ void Request_work(my_stack_t stack, long my_rank) {
       pthread_mutex_lock(&stack_request.cond_mutex);
       pthread_cond_signal(&stack_request.cond);
       pthread_mutex_unlock(&stack_request.cond_mutex);
+      printf("%d > send done\n", proc_id);
+      MPI_Send(&proc_id, 1, MPI_INT, 0, TAG_DONE, comm_done);
       return;
    }
 
@@ -327,7 +338,6 @@ void Request_work(my_stack_t stack, long my_rank) {
    // Check if the program is done
    if (running_threads == 0) {
       pthread_mutex_unlock(&stack_request.stack_mutex);
-      MPI_Send(&proc_id, 1, MPI_INT, 0, TAG_DONE, comm_done);
       return;
    }
 
@@ -727,11 +737,17 @@ int Update_best_tour_local(tour_t tour) {
  *    best_tour:  the current best tour
  */
 void Update_best_tour_global(tour_t tour) {
+   printf("%d > update best??\n", proc_id);
    if (Update_best_tour_local(tour)) {
-      if (proc_id == 0)
-         MPI_Bcast(tour->cities, n, MPI_INT, 0, comm_best);
-      else
-         MPI_Send(tour->cities, n, MPI_INT, 0, TAG_BEST_TOUR, comm_best);
+      printf("%d > update best\n", proc_id);
+//      if (proc_id == 0) {
+//         MPI_Request req = MPI_REQUEST_NULL;
+//         MPI_Ibcast(tour->cities, n, MPI_INT, 0, comm_best, &req);
+//         MPI_Wait(&req, MPI_STATUS_IGNORE);
+////         MPI_Bcast(tour->cities, n, MPI_INT, 0, comm_best);
+//      }
+//      else
+//         MPI_Send(tour->cities, n, MPI_INT, 0, TAG_BEST_TOUR, comm_best);
    }
 }
 
