@@ -101,11 +101,7 @@ void Print_tour(long my_rank, tour_t tour, char* title) {
  *    tour2
  */
 void Copy_tour(tour_t tour1, tour_t tour2) {
-// int i;
-
    memcpy(tour2->cities, tour1->cities, (tour1->length+1)*sizeof(city_t));
-// for (i = 0; i <= n; i++)
-//   tour2->cities[i] =  tour1->cities[i];
    tour2->count = tour1->count;
    tour2->cost = tour1->cost;
 }  /* Copy_tour */
@@ -161,6 +157,23 @@ int Visited(tour_t tour, city_t city) {
    return FALSE;
 }  /* Visited */
 
+
+/*------------------------------------------------------------------
+ * Function:    Fix_tour_from_msg
+ * Purpose:     Fixex a tour_t struct with the cities from msg.
+ * In/Out args: tour
+ */
+void Fix_tour_from_msg(tour_t tour) {
+   for (int i=0; i<=tour->length; i++)
+      if (tour->cities[i] ==  NO_CITY) {
+         tour->count = i;
+         break;
+      }
+
+   tour->cost = 0;
+   for (int i=1; i<tour->count; i++)
+      tour->cost += Cost(tour->cities[i-1], tour->cities[i]);
+}
 
 /******************************* STACK ***************************/
 
@@ -301,20 +314,3 @@ void Print_stack(my_stack_t stack, long my_rank, char title[]) {
       printf("%s\n", string);
    }
 }  /* Print_stack */
-
-/*------------------------------------------------------------------
- * Function:    Fix_tour_from_msg
- * Purpose:     Fixex a tour_t struct with the cities from msg.
- * In/Out args: tour
- */
-void Fix_tour_from_msg(tour_t tour) {
-   for (int i=0; i<tour->length; i++)
-      if (tour->cities[i] ==  NO_CITY) {
-         tour->count = i;
-         break;
-      }
-
-   tour->cost = 0;
-   for (int i=1; i<tour->count; i++)
-      tour->cost += Cost(tour->cities[i-1], tour->cities[i]);
-}
