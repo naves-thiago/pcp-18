@@ -14,9 +14,11 @@
 static const int INFINITY = 1000000;
 static const int FALSE = 0;
 static const int TRUE = 1;
+#ifdef USE_MPI
 static const int TAG_DONE = 0;
 static const int TAG_BEST_TOUR = 1;
 //static const int TAG_WORK = 2;
+#endif
 
 typedef struct {
    int curr_tc;  // Number of threads that have entered the barrier
@@ -58,9 +60,11 @@ int running_procs;
 pthread_mutex_t running_mutex;
 thread_info_t* thread_infos;
 
+#ifdef USE_MPI
 MPI_Comm comm_done;
 //MPI_Comm comm_work;
 #define comm_best MPI_COMM_WORLD
+#endif
 pthread_t proxy_receive_msg_thread;
 
 void Usage(char* prog_name);
@@ -108,8 +112,9 @@ int main(int argc, char* argv[]) {
    double start, finish;
    long thread;
    pthread_t* thread_handles;
-   int mpi_thread_level;
 
+#ifdef USE_MPI
+   int mpi_thread_level;
    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mpi_thread_level);
    if (mpi_thread_level != MPI_THREAD_MULTIPLE) {
       printf("MPI Init thread failed\n");
@@ -120,7 +125,7 @@ int main(int argc, char* argv[]) {
    MPI_Comm_size(MPI_COMM_WORLD, &procs);
    MPI_Comm_dup(MPI_COMM_WORLD, &comm_done);
    //MPI_Comm_dup(MPI_COMM_WORLD, &comm_work);
-
+#endif
    running_procs = procs;
 
    if (argc != 4) Usage(argv[0]);
@@ -188,10 +193,12 @@ int main(int argc, char* argv[]) {
    pthread_mutex_destroy(&stack_request.cond_mutex);
    pthread_mutex_destroy(&stack_request.stack_mutex);
    pthread_cond_destroy(&stack_request.cond);
+   Free_queue(queue);
+#ifdef USE_MPI
    MPI_Comm_free(&comm_done);
    //MPI_Comm_free(&comm_work);
-   Free_queue(queue);
    MPI_Finalize();
+#endif
    return 0;
 }  /* main */
 
@@ -205,11 +212,15 @@ void Usage(char* prog_name) {
    fprintf(stderr, "usage: mpirun -n <procs> %s <thread_count> "
                    "<digraph file> <min split size>\n",
          prog_name);
+#ifdef USE_MPI
    MPI_Finalize();
+#endif
    exit(0);
 }  /* Usage */
 
-
+#ifndef USE_MPI
+void* Proxy_receive_msg(void* p) {return NULL;}
+#else
 /*------------------------------------------------------------------
  * Function:    Proxy_send
  * Purpose:     Acts as a proxy to receive messages and send work to
@@ -294,8 +305,10 @@ void* Proxy_receive_msg(void* p) {
    Free_tour(t, NULL);
    return NULL;
 }
+#endif
 
 
+#if 0
 /*------------------------------------------------------------------
  * Function:    Proxy_receive
  * Purpose:     Acts as a proxy to receive messages from other processes.
@@ -319,6 +332,7 @@ void* Proxy_request_work(void* p) {
    }
    return NULL;
 }
+#endif
 
 
 /*------------------------------------------------------------------
@@ -355,7 +369,9 @@ void Request_work(my_stack_t stack, long my_rank) {
       pthread_cond_signal(&stack_request.cond);
       pthread_mutex_unlock(&stack_request.cond_mutex);
       printf("%d > send done\n", proc_id);
+#ifdef USE_MPI
       MPI_Send(&proc_id, 1, MPI_INT, 0, TAG_DONE, comm_done);
+#endif
       return;
    }
 
@@ -423,6 +439,7 @@ void* Par_tree_search(void* rank) {
    my_stack_t avail;  // Stack for unused tours
    tour_t curr_tour;
 
+   printf("Thread %ld started\n", my_rank);
    //if (my_rank != 0)
    //   gdb();
    avail = Init_stack(n);
@@ -444,6 +461,7 @@ void* Par_tree_search(void* rank) {
       }
       Free_tour(curr_tour, avail);
    }
+   printf("Thread %ld done\n", my_rank);
    Free_stack(avail);
    Free_stack(stack);
 
@@ -772,6 +790,7 @@ void Update_best_tour_global(tour_t tour) {
       Print_tour(proc_id, tour, "Sent");
       if (tour->count < 6)
          gdb();
+#ifdef USE_MPI
       if (proc_id == 0) {
          MPI_Request req = MPI_REQUEST_NULL;
          MPI_Ibcast(tour->cities, n, MPI_INT, 0, comm_best, &req);
@@ -779,6 +798,7 @@ void Update_best_tour_global(tour_t tour) {
       }
       else
          MPI_Send(tour->cities, n, MPI_INT, 0, TAG_BEST_TOUR, comm_best);
+#endif
    }
 }
 

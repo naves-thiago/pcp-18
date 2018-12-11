@@ -13,7 +13,7 @@ LDFLAGS:=-Wall -g -lpthread
 CFLAGS:= -Wall -g -O2 -std=c99 -MMD
 
 #MPICC:=/home/thiago/dev/pcp/t2/mpi/bin/mpicc -Wl,-rpath -Wl,/usr/lib64/openmpi/lib
-MPICC:=mpicc
+MPICC:=mpicc -DUSE_MPI
 #MPICC:=gcc
 .PHONY: clean
 
