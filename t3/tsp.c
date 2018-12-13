@@ -74,7 +74,6 @@ void Request_work(my_stack_t stack, long my_rank);
 tour_t Get_work(my_stack_t stack, long my_rank);
 void* Par_tree_search(void* rank);
 void* Proxy_receive_msg(void* p);
-void* Proxy_request_work(void* p);
 
 void Partition_tree(long my_rank, my_stack_t stack);
 void Set_init_tours(long my_rank, int* my_first_tour_p,
@@ -253,7 +252,9 @@ void* Proxy_receive_msg(void* p) {
             //printf("%d > recv best\n", proc_id);
             Fix_tour_from_msg(t);
             Update_best_tour_global(t);
+#ifdef DEBUG
             Print_tour(proc_id, t, "Recv");
+#endif
             MPI_Irecv(t->cities, n, MPI_INT, MPI_ANY_SOURCE, TAG_BEST_TOUR,
                   comm_best, &requests[TAG_BEST_TOUR]);
          }
@@ -269,7 +270,9 @@ void* Proxy_receive_msg(void* p) {
                      MPI_Recv(t->cities, n, MPI_INT, MPI_ANY_SOURCE, TAG_BEST_TOUR,
                            comm_best, MPI_STATUS_IGNORE);
                      Update_best_tour_local(t);
+#ifdef DEBUG
                      Print_tour(proc_id, t, "Recv2");
+#endif
                   }
                   else
                      break;
@@ -291,7 +294,9 @@ void* Proxy_receive_msg(void* p) {
             //printf("%d > recv best\n", proc_id);
             Fix_tour_from_msg(t);
             Update_best_tour_local(t);
+#ifdef DEBUG
             Print_tour(proc_id, t, "Recv");
+#endif
             MPI_Ibcast(t->cities, n, MPI_INT, 0, comm_best, &requests[TAG_BEST_TOUR]);
          }
          else {
@@ -303,33 +308,6 @@ void* Proxy_receive_msg(void* p) {
    }
 
    Free_tour(t, NULL);
-   return NULL;
-}
-#endif
-
-
-#if 0
-/*------------------------------------------------------------------
- * Function:    Proxy_receive
- * Purpose:     Acts as a proxy to receive messages from other processes.
- */
-void* Proxy_request_work(void* p) {
-   while (running_procs > 1) {
-      if (stack_request.stack != NULL && running_threads == 0) {
-         if (pthread_mutex_trylock(&stack_request.cond_mutex) == 0) {
-            // MPI_Send ...
-            // MPI_Recv ...
-            // Copy received data to stack_request.stack
-            stack_request.stack = NULL;
-            pthread_cond_signal(&stack_request.cond);
-            pthread_mutex_unlock(&stack_request.cond_mutex);
-         }
-         else {
-            printf("Requesting work from another process would deadlock!\n");
-            while(1);
-         }
-      }
-   }
    return NULL;
 }
 #endif
@@ -368,7 +346,9 @@ void Request_work(my_stack_t stack, long my_rank) {
       pthread_mutex_lock(&stack_request.cond_mutex);
       pthread_cond_signal(&stack_request.cond);
       pthread_mutex_unlock(&stack_request.cond_mutex);
+#ifdef DEBUG
       printf("%d > send done\n", proc_id);
+#endif
 #ifdef USE_MPI
       MPI_Send(&proc_id, 1, MPI_INT, 0, TAG_DONE, comm_done);
 #endif
@@ -414,7 +394,9 @@ void Request_work(my_stack_t stack, long my_rank) {
 tour_t Get_work(my_stack_t stack, long my_rank) {
    if (Empty_stack(stack)) {
       Request_work(stack, my_rank);
+#ifdef DEBUG
       Print_stack(stack, my_rank, "Received");
+#endif
    }
 
    return Pop(stack);
@@ -487,7 +469,9 @@ void Partition_tree(long my_rank, my_stack_t stack) {
 
    if (my_rank % proc_threads == 0) queue_size = Get_upper_bd_queue_sz();
    My_barrier(bar_str); // TODO: Only used in this function
+#ifdef DEBUG
    printf("Th %ld > queue_size = %d\n", my_rank, queue_size);
+#endif
 
    if (queue_size == 0) pthread_exit(NULL);
 
@@ -495,16 +479,22 @@ void Partition_tree(long my_rank, my_stack_t stack) {
    My_barrier(bar_str);
    Set_init_tours(my_rank, &my_first_tour, &my_last_tour);
 
+#ifdef DEBUG
    printf("Th %ld > init_tour_count = %d, first = %d, last = %d\n", 
          my_rank, init_tour_count, my_first_tour, my_last_tour);
+#endif
 
    for (i = my_last_tour; i >= my_first_tour; i--) {
 
+#ifdef DEBUG
       Print_tour(my_rank, Queue_elt(queue,i), "About to push");
+#endif
 
       Push(stack, Queue_elt(queue,i));
    }
+#ifdef DEBUG
    Print_stack(stack, my_rank, "After set up");
+#endif
 }  /* Partition_tree */
 
 /*------------------------------------------------------------------
@@ -787,9 +777,13 @@ void Update_best_tour_global(tour_t tour) {
    //printf("%d > update best??\n", proc_id);
    if (Update_best_tour_local(tour)) {
       //printf("%d > update best\n", proc_id);
+#ifdef DEBUG
       Print_tour(proc_id, tour, "Sent");
-      if (tour->count < 6)
-         gdb();
+#endif
+      if (tour->count < 6) {
+         //gdb();
+         exit(1);
+      }
 #ifdef USE_MPI
       if (proc_id == 0) {
          MPI_Request req = MPI_REQUEST_NULL;
